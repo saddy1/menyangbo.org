@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Person;
+use App\Models\UnionModel;
+use App\Models\ParentChildEdge;
 use Illuminate\Http\Request;
 
 class TreeController extends Controller
@@ -48,20 +50,20 @@ class TreeController extends Controller
 
 public function graph(Request $request)
 {
-    $rootId   = $request->query('root_id') ?? \App\Models\Person::query()->orderBy('id')->value('id');
+    $rootId   = $request->query('root_id') ?? Person::query()->orderBy('id')->value('id');
     $maxDepth = (int)($request->query('depth') ?? 6);
     if (!$rootId) return response()->json(['nodes'=>[], 'links'=>[]]);
 
     // Load all minimal data once
-    $people = \App\Models\Person::query()
+    $people = Person::query()
         ->select('id','display_name','gender','is_deceased','birth_date','death_date','photo_path')
         ->get()->keyBy('id');
 
-    $unions = \App\Models\UnionModel::query()
+    $unions = UnionModel::query()
         ->select('id','spouse1_id','spouse2_id','type','start_date')
         ->get();
 
-    $edges = \App\Models\ParentChildEdge::query()
+    $edges = ParentChildEdge::query()
         ->select('parent_id','child_id','relation_type')
         ->get();
 
@@ -188,17 +190,17 @@ public function treeJson(Request $request)
     $rootId   = (int)($request->query('root_id') ?? 0);
     $maxDepth = (int)($request->query('depth') ?? 8);
     if (!$rootId) {
-        $rootId = \App\Models\Person::query()->orderBy('id')->value('id') ?? 0;
+        $rootId =Person::query()->orderBy('id')->value('id') ?? 0;
         if (!$rootId) return response()->json([]);
     }
 
     // Load once
-    $people = \App\Models\Person::query()
+    $people = Person::query()
         ->select('id','display_name','gender','is_deceased','birth_date','death_date','photo_path')
         ->get()->keyBy('id');
 
     // children by parent (birth/adoption)
-    $edges = \App\Models\ParentChildEdge::query()
+    $edges = ParentChildEdge::query()
         ->select('parent_id','child_id','relation_type')->get();
     $childrenByParent = [];
     foreach ($edges as $e) {
@@ -207,7 +209,7 @@ public function treeJson(Request $request)
     }
 
     // spouses (for badge/tooltip)
-    $unions = \App\Models\UnionModel::query()->select('id','spouse1_id','spouse2_id','start_date')->get();
+    $unions = UnionModel::query()->select('id','spouse1_id','spouse2_id','start_date')->get();
     $spousesByPerson = [];
     foreach ($unions as $u) {
         $spousesByPerson[$u->spouse1_id][] = $u->spouse2_id;
