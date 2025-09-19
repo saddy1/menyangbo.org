@@ -1,0 +1,23 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration {
+    public function up(): void {
+        Schema::create('events', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('person_id')->constrained('persons')->cascadeOnDelete();
+            $table->string('title');
+            $table->string('event_type')->nullable(); // Education/Job/etc.
+            $table->date('event_date')->nullable();
+            $table->text('description')->nullable(); // Nepali text ok
+            $table->timestamps();
+        });
+    }
+
+    public function down(): void {
+        Schema::dropIfExists('events');
+    }
+};
