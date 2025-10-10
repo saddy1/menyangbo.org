@@ -87,7 +87,7 @@
            <li>
           <a href="{{ route('admin.feedback.index') }}"
             class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-800">
-            <i class="fas fa-sitemap w-5 text-gray-300"></i><span>Feedback</span>
+            <i class="fa-solid fa-comments w-5 text-gray-300"></i><span>Feedback</span>
           </a>
         </li>
       </ul>
