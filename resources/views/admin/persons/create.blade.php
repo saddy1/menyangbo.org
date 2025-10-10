@@ -1,7 +1,7 @@
 @extends('admin.layout')
 @section('title','Admin • Add Person')
 @section('content')
-<div class="py-6 max-w-3xl">
+<div class="py-6 ">
   <h1 class="text-2xl font-bold mb-4">Add Person</h1>
   <form method="POST" action="{{ route('admin.persons.store') }}" class="bg-white border rounded-xl p-4 space-y-4">
     @csrf

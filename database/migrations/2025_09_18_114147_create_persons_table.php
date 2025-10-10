@@ -13,10 +13,11 @@ return new class extends Migration {
             $table->string('family_name')->nullable();
             $table->string('display_name')->index();
             $table->enum('gender', ['male','female','other','unknown'])->default('unknown');
-            $table->date('birth_date')->nullable();
-            $table->date('death_date')->nullable();
+            $table->string('birth_date')->nullable();
+            $table->string('death_date')->nullable();
             $table->boolean('is_deceased')->default(false);
             $table->string('photo_path')->nullable();
+            $table->string('pusta')->nullable();
             $table->longText('bio')->nullable();
             $table->timestamps();
             $table->softDeletes();

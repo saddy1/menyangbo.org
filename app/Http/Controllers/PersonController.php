@@ -23,8 +23,8 @@ class PersonController extends Controller
             'middle_name'  => ['nullable','string','max:255'],
             'family_name'  => ['nullable','string','max:255'],
             'gender'       => ['required', Rule::in(['male','female','other','unknown'])],
-            'birth_date'   => ['nullable','date'],
-            'death_date'   => ['nullable','date','after_or_equal:birth_date'],
+            'birth_date'   => ['nullable'],
+            'death_date'   => ['nullable','after_or_equal:birth_date'],
             'is_deceased'  => ['boolean'],
             'bio'          => ['nullable','string'],
         ]);

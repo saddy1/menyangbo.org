@@ -25,7 +25,7 @@ class UnionController extends Controller
             'spouse1_id' => ['required','integer','different:spouse2_id','exists:persons,id'],
             'spouse2_id' => ['required','integer','exists:persons,id'],
             'type'       => ['required', Rule::in(['marriage','partnership','other'])],
-            'start_date' => ['nullable','date'],
+            'start_date' => ['nullable'],
             'end_date'   => ['nullable','date','after_or_equal:start_date'],
             'notes'      => ['nullable','string','max:2000'],
         ]);

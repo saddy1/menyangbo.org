@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property \Illuminate\Support\Carbon|null $death_date
  * @property bool        $is_deceased
  * @property string|null $photo_path
+ * @property string|null $pusta
  * @property string|null $bio
  *
  * Accessors:
@@ -33,7 +34,7 @@ class Person extends Model
 
     protected $fillable = [
         'given_name','middle_name','family_name','display_name',
-        'gender','birth_date','death_date','is_deceased','photo_path','bio'
+        'gender','birth_date','death_date','is_deceased','pusta','photo_path','bio'
     ];
 
     protected $casts = [

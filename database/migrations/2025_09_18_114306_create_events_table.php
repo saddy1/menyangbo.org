@@ -11,7 +11,7 @@ return new class extends Migration {
             $table->foreignId('person_id')->constrained('persons')->cascadeOnDelete();
             $table->string('title');
             $table->string('event_type')->nullable(); // Education/Job/etc.
-            $table->date('event_date')->nullable();
+            $table->string('event_date')->nullable();
             $table->text('description')->nullable(); // Nepali text ok
             $table->timestamps();
         });

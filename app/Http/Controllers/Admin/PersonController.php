@@ -46,14 +46,15 @@ class PersonController extends Controller
             'birth_date'   => ['nullable','date'],
             'death_date'   => ['nullable','date','after_or_equal:birth_date'],
             'is_deceased'  => ['nullable','boolean'],
+            'pusta'         => ['nullable','string','max:255'],
             'bio'          => ['nullable','string'],
             'photo_path'   => ['nullable','string','max:255'],
         ]);
 
-        $data['is_deceased'] = (bool)($data['is_deceased'] ?? false);
-        if ($data['is_deceased'] && empty($data['death_date'])) {
-            return back()->withErrors(['death_date' => 'If deceased, मृत्यु मिति आवश्यक छ.'])->withInput();
-        }
+        // $data['is_deceased'] = (bool)($data['is_deceased'] ?? false);
+        // if ($data['is_deceased'] && empty($data['death_date'])) {
+        //     return back()->withErrors(['death_date' => 'If deceased, मृत्यु मिति आवश्यक छ.'])->withInput();
+        // }
 
         Person::create($data);
         return redirect()->route('admin.persons.index')->with('success', 'व्यक्ति थपियो।');
@@ -75,14 +76,16 @@ class PersonController extends Controller
             'birth_date'   => ['nullable','date'],
             'death_date'   => ['nullable','date','after_or_equal:birth_date'],
             'is_deceased'  => ['nullable','boolean'],
+            'pusta'         => ['nullable','string','max:255'],
             'bio'          => ['nullable','string'],
             'photo_path'   => ['nullable','string','max:255'],
         ]);
+     
 
-        $data['is_deceased'] = (bool)($data['is_deceased'] ?? false);
-        if ($data['is_deceased'] && empty($data['death_date'])) {
-            return back()->withErrors(['death_date' => 'If deceased, मृत्यु मिति आवश्यक छ.'])->withInput();
-        }
+        // $data['is_deceased'] = (bool)($data['is_deceased'] ?? false);
+        // if ($data['is_deceased'] && empty($data['death_date'])) {
+        //     return back()->withErrors(['death_date' => 'If deceased, मृत्यु मिति आवश्यक छ.'])->withInput();
+        // }
 
         $person->update($data);
         return redirect()->route('admin.persons.index')->with('success', 'अद्यावधिक गरियो।');

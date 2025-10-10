@@ -11,8 +11,8 @@ return new class extends Migration {
             $table->foreignId('spouse1_id')->constrained('persons')->cascadeOnDelete();
             $table->foreignId('spouse2_id')->constrained('persons')->cascadeOnDelete();
             $table->enum('type', ['marriage','partnership','other'])->default('marriage');
-            $table->date('start_date')->nullable();
-            $table->date('end_date')->nullable();
+            $table->string('start_date')->nullable();
+            $table->string('end_date')->nullable();
             $table->text('notes')->nullable();
             $table->timestamps();
 

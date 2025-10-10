@@ -1,8 +1,11 @@
 <?php
 
 namespace App\Providers;
+use Illuminate\Support\Facades\View;
+use App\Models\Admin;
 
 use Illuminate\Support\ServiceProvider;
+
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -19,6 +22,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+         View::composer('admin.layout', function ($view) {
+            $view->with('admin', Admin::find(session('admin_id')));
+        });
     }
 }
