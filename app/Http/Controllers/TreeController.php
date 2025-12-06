@@ -9,47 +9,73 @@ use Illuminate\Http\Request;
 
 class TreeController extends Controller
 {
-    public function index(Request $request)
-    {
-        $rootId = $request->query('root_id') ?? Person::query()->orderBy('id')->value('id');
+ public function index(Request $request)
+{
+    $rootId = $request->query('root_id') ?? Person::query()->orderBy('id')->value('id');
 
-        // If no people yet, show an empty state instead of crashing
-        if (!$rootId) {
-            return view('tree.index', [
-                'root'      => null,
-                'levels'    => [],
-                'allPeople' => collect(),
-            ]);
-        }
-
-        $root = Person::with([
-            'parents','children','childEdges','parentEdges',
-            'unionsAsSpouse1.spouse2','unionsAsSpouse2.spouse1'
-        ])->findOrFail($rootId);
-
-        // simple BFS to levels for demo
-        $levels  = [];
-        $visited = [];
-        $queue   = [[$root, 0]];
-
-        while (!empty($queue)) {
-            [$node, $lvl] = array_shift($queue);
-            if (isset($visited[$node->id])) continue;
-            $visited[$node->id] = true;
-
-            $levels[$lvl]   = $levels[$lvl] ?? [];
-            $levels[$lvl][] = $node;
-
-            foreach ($node->children as $c) {
-                $queue[] = [$c, $lvl + 1];
-            }
-        }
-
-        // all people for quick “Root select”
-        $allPeople = Person::orderBy('display_name')->get(['id','display_name']);
-
-        return view('tree.index', compact('root','levels','allPeople'));
+    if (!$rootId) {
+        return view('tree.index', [
+            'root'       => null,
+            'levels'     => [],
+            'allPeople'  => collect(),
+            'pustas'     => collect(),
+        ]);
     }
+
+    $root = Person::with([
+        'parents','children','childEdges','parentEdges',
+        'unionsAsSpouse1.spouse2','unionsAsSpouse2.spouse1'
+    ])->findOrFail($rootId);
+
+    // BFS just for the small "levels" view if you use it elsewhere
+    $levels = [];
+    $visited = [];
+    $queue = [[$root, 0]];
+    while (!empty($queue)) {
+        [$node, $lvl] = array_shift($queue);
+        if (isset($visited[$node->id])) continue;
+        $visited[$node->id] = true;
+        $levels[$lvl] = $levels[$lvl] ?? [];
+        $levels[$lvl][] = $node;
+        foreach ($node->children as $c) $queue[] = [$c, $lvl+1];
+    }
+
+    $allPeople = Person::orderBy('display_name')->get(['id','display_name']);
+    $pustas    = Person::whereNotNull('pusta')->distinct()->orderBy('pusta')->pluck('pusta');
+
+    return view('tree.index', compact('root','levels','allPeople','pustas'));
+}
+
+/** Name + optional pusta filter (for instant search) */
+public function searchPeople(Request $request)
+{
+    $term  = trim($request->query('term', ''));
+    $pusta = trim($request->query('pusta', ''));
+
+    $q = Person::query();
+    if ($term !== '')  $q->where('display_name', 'like', "%{$term}%");
+    if ($pusta !== '') $q->where('pusta', $pusta);
+
+    return response()->json(
+        $q->orderBy('display_name')->limit(50)->get(['id','display_name','pusta'])
+    );
+}
+
+/** List people in a selected pusta (for the pusta dropdown) */
+public function peopleByPusta(Request $request)
+{
+    $pusta = trim($request->query('pusta',''));
+    if ($pusta === '') return response()->json([]);
+
+    // Older/elder first if dates exist, else by name
+    $rows = Person::where('pusta', $pusta)
+        ->orderByRaw('CASE WHEN birth_date IS NULL THEN 1 ELSE 0 END, birth_date ASC')
+        ->orderBy('display_name')
+        ->limit(100)
+        ->get(['id','display_name','pusta']);
+
+    return response()->json($rows);
+}
 
     // --- Graph endpoint (nodes/links for force/union graph) ---
     public function graph(Request $request)

@@ -94,7 +94,7 @@
             </div>
 
             <!-- Drawer nav -->
-            <nav class="p-4 space-y-2 text-sm">
+            <nav class="flex p-4 space-y-2 text-sm font-medium flex-col">
                <a href="{{ route('committee.index') }}" class="hover:text-red-300">कार्यसमिति</a>
                 <a href="{{ route('tree.index') }}" class="hover:text-red-300">वंशावली</a>
                 <a href="{{ route('feedback.create') }}" class="text-sm hover:underline">सुझाव</a>

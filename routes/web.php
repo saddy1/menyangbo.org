@@ -24,6 +24,10 @@ Route::get('/sujhav/thanks', [FeedbackController::class,'thanks'])->name('feedba
 
 
 Route::get('/वशावलि', [TreeController::class, 'index'])->name('tree.index');
+Route::get('/people/search', [TreeController::class, 'searchPeople'])->name('people.search');     // name+pusta filter
+Route::get('/people/by-pusta', [TreeController::class, 'peopleByPusta'])->name('people.byPusta'); // list people in a pusta
+
+
 Route::get('/graph', [TreeController::class, 'graph'])->name('tree.graph');
 Route::get('/कार्यसमिति', [TreeController::class, 'committee'])->name('committee.index');
 
