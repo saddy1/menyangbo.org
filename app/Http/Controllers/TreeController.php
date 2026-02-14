@@ -3,281 +3,176 @@
 namespace App\Http\Controllers;
 
 use App\Models\Person;
-use App\Models\UnionModel;
 use App\Models\ParentChildEdge;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 class TreeController extends Controller
 {
- public function index(Request $request)
-{
-    $rootId = $request->query('root_id') ?? Person::query()->orderBy('id')->value('id');
+    public function committee()
+    {
+       
+        return view('committee');
+    }
+    public function index(Request $request)
+    {
+        $rootId = (int)($request->query('root_id') ?: (Person::query()->orderBy('id')->value('id') ?? 0));
 
-    if (!$rootId) {
-        return view('tree.index', [
-            'root'       => null,
-            'levels'     => [],
-            'allPeople'  => collect(),
-            'pustas'     => collect(),
+        $pustas = Person::query()
+            ->whereNotNull('pusta')
+            ->distinct()
+            ->orderBy('pusta')
+            ->pluck('pusta')
+            ->values();
+
+        return view('tree.simple', [
+            'rootId' => $rootId,
+            'pustas' => $pustas,
         ]);
     }
 
-    $root = Person::with([
-        'parents','children','childEdges','parentEdges',
-        'unionsAsSpouse1.spouse2','unionsAsSpouse2.spouse1'
-    ])->findOrFail($rootId);
-
-    // BFS just for the small "levels" view if you use it elsewhere
-    $levels = [];
-    $visited = [];
-    $queue = [[$root, 0]];
-    while (!empty($queue)) {
-        [$node, $lvl] = array_shift($queue);
-        if (isset($visited[$node->id])) continue;
-        $visited[$node->id] = true;
-        $levels[$lvl] = $levels[$lvl] ?? [];
-        $levels[$lvl][] = $node;
-        foreach ($node->children as $c) $queue[] = [$c, $lvl+1];
-    }
-
-    $allPeople = Person::orderBy('display_name')->get(['id','display_name']);
-    $pustas    = Person::whereNotNull('pusta')->distinct()->orderBy('pusta')->pluck('pusta');
-
-    return view('tree.index', compact('root','levels','allPeople','pustas'));
-}
-
-/** Name + optional pusta filter (for instant search) */
-public function searchPeople(Request $request)
-{
-    $term  = trim($request->query('term', ''));
-    $pusta = trim($request->query('pusta', ''));
-
-    $q = Person::query();
-    if ($term !== '')  $q->where('display_name', 'like', "%{$term}%");
-    if ($pusta !== '') $q->where('pusta', $pusta);
-
-    return response()->json(
-        $q->orderBy('display_name')->limit(50)->get(['id','display_name','pusta'])
-    );
-}
-
-/** List people in a selected pusta (for the pusta dropdown) */
-public function peopleByPusta(Request $request)
-{
-    $pusta = trim($request->query('pusta',''));
-    if ($pusta === '') return response()->json([]);
-
-    // Older/elder first if dates exist, else by name
-    $rows = Person::where('pusta', $pusta)
-        ->orderByRaw('CASE WHEN birth_date IS NULL THEN 1 ELSE 0 END, birth_date ASC')
-        ->orderBy('display_name')
-        ->limit(100)
-        ->get(['id','display_name','pusta']);
-
-    return response()->json($rows);
-}
-
-    // --- Graph endpoint (nodes/links for force/union graph) ---
-    public function graph(Request $request)
+    /** Search by ID / Nepali name / English name + optional pusta filter */
+    public function searchPeople(Request $request)
     {
-        $rootId   = $request->query('root_id') ?? Person::query()->orderBy('id')->value('id');
-        $maxDepth = (int)($request->query('depth') ?? 1000);
-        if (!$rootId) return response()->json(['nodes'=>[], 'links'=>[]]);
+        $term  = trim($request->query('term', ''));
+        $pusta = trim($request->query('pusta', ''));
 
-        // Load all minimal data once
-        $people = Person::query()
-            ->select('id','display_name','gender','is_deceased','birth_date','death_date','pusta','photo_path')
-            ->get()->keyBy('id');
+        if ($term === '' && $pusta === '') return response()->json([]);
 
-        $unions = UnionModel::query()
-            ->select('id','spouse1_id','spouse2_id','type','start_date')
-            ->get();
+        $hasEn1 = Schema::hasColumn('people', 'display_name_en');
+        $hasEn2 = Schema::hasColumn('people', 'name_en');
 
-        $edges = ParentChildEdge::query()
-            ->select('parent_id','child_id','relation_type')
-            ->get();
+        $q = Person::query()->select('id', 'display_name', 'gender', 'pusta');
 
-        // childrenByParent map
-        $childrenByParent = [];
-        foreach ($edges as $e) {
-            $childrenByParent[$e->parent_id][$e->child_id] = true;
+        if ($hasEn1) $q->addSelect('display_name_en');
+        if ($hasEn2) $q->addSelect('name_en');
+
+        if ($pusta !== '') {
+            $q->where('pusta', $pusta);
         }
 
-        // unionsByPerson map
-        $unionsByPerson = [];
-        foreach ($unions as $u) {
-            $unionsByPerson[$u->spouse1_id][] = $u;
-            $unionsByPerson[$u->spouse2_id][] = $u;
-        }
-
-        $nodes       = [];
-        $links       = [];
-        $seenNode    = [];
-        $seenLink    = [];
-        $q           = [[$rootId, 0]];
-        $visitedPerson = [];
-
-        // Helper: add person node
-        $addPerson = function ($pId, $level) use (&$nodes, &$seenNode, $people) {
-            if (!isset($people[$pId])) return;
-            if (!isset($seenNode[$pId])) {
-                $p = $people[$pId];
-                $nodes[] = [
-                    'id'          => (string)$p->id,
-                    'type'        => 'person',
-                    'name'        => $p->display_name,
-                    'gender'      => $p->gender,
-                    'is_deceased' => (bool)$p->is_deceased,
-                    'birth_date'  => optional($p->birth_date)->format('Y-m-d'),
-                    'death_date'  => optional($p->death_date)->format('Y-m-d'),
-                    'pusta'       => $p->pusta,
-                    'photo'       => $p->photo_path,
-                    'level'       => $level,
-                ];
-                $seenNode[$pId] = true;
-            }
-        };
-
-        // Helper: add union node (U###)
-        $addUnion = function ($u, $level) use (&$nodes, &$seenNode, $people) {
-            $uid = 'U' . $u->id;
-            if (!isset($seenNode[$uid])) {
-                $sp1   = $people[$u->spouse1_id] ?? null;
-                $sp2   = $people[$u->spouse2_id] ?? null;
-                $label = trim(($sp1->display_name ?? '---') . ' + ' . ($sp2->display_name ?? '---'));
-                $nodes[] = [
-                    'id'         => $uid,
-                    'type'       => 'union',
-                    'name'       => $label,
-                    'start_date' => optional($u->start_date)->format('Y-m-d'),
-                    'level'      => $level,
-                ];
-                $seenNode[$uid] = true;
-            }
-            return $uid;
-        };
-
-        // Helper: add directed edge
-        $addEdge = function ($src, $dst) use (&$links, &$seenLink) {
-            $key = $src . '>' . $dst;
-            if (!isset($seenLink[$key])) {
-                $links[] = ['source' => $src, 'target' => $dst];
-                $seenLink[$key] = true;
-            }
-        };
-
-        while (!empty($q)) {
-            [$pid, $lvl] = array_shift($q);
-            if (isset($visitedPerson[$pid]) || $lvl > $maxDepth) continue;
-            $visitedPerson[$pid] = true;
-
-            // Person node
-            $addPerson($pid, $lvl);
-
-            // For each union of this person: spouse -> union; union -> shared children; enqueue children
-            foreach (($unionsByPerson[$pid] ?? []) as $u) {
-                $uid = $addUnion($u, $lvl); // union node at same level as spouses
-
-                // spouse links
-                $addPerson($u->spouse1_id, $lvl);
-                $addPerson($u->spouse2_id, $lvl);
-                $addEdge((string)$u->spouse1_id, $uid);
-                $addEdge((string)$u->spouse2_id, $uid);
-
-                // shared children = intersection of children(sp1) ∩ children(sp2)
-                $c1 = array_keys($childrenByParent[$u->spouse1_id] ?? []);
-                $c2 = array_keys($childrenByParent[$u->spouse2_id] ?? []);
-                $shared = array_values(array_intersect($c1, $c2));
-
-                foreach ($shared as $cid) {
-                    $addPerson($cid, $lvl + 1);
-                    $addEdge($uid, (string)$cid);
-                    if (!isset($visitedPerson[$cid])) $q[] = [$cid, $lvl + 1];
+        if ($term !== '') {
+            $q->where(function ($w) use ($term, $hasEn1, $hasEn2) {
+                // numeric id match
+                if (ctype_digit($term)) {
+                    $w->orWhere('id', (int)$term);
                 }
-            }
 
-            // Single-parent children (no union found)
-            $kids = array_keys($childrenByParent[$pid] ?? []);
-            foreach ($kids as $cid) {
-                // If already covered by a union above, skip
-                $covered = false;
-                foreach (($unionsByPerson[$pid] ?? []) as $u) {
-                    $both = isset($childrenByParent[$u->spouse1_id][$cid]) && isset($childrenByParent[$u->spouse2_id][$cid]);
-                    if ($both) { $covered = true; break; }
-                }
-                if ($covered) continue;
+                // Nepali name
+                $w->orWhere('display_name', 'like', "%{$term}%");
 
-                $addPerson($cid, $lvl + 1);
-                $addEdge((string)$pid, (string)$cid); // direct fallback
-                if (!isset($visitedPerson[$cid])) $q[] = [$cid, $lvl + 1];
-            }
+                // English name columns (if exist)
+                if ($hasEn1) $w->orWhere('display_name_en', 'like', "%{$term}%");
+                if ($hasEn2) $w->orWhere('name_en', 'like', "%{$term}%");
+            });
         }
 
-        return response()->json(['nodes' => $nodes, 'links' => $links]);
+        $rows = $q->orderBy('display_name')->limit(30)->get()->values();
+
+        // return unified "name_en" for UI
+        $mapped = $rows->map(function ($r) use ($hasEn1, $hasEn2) {
+            $en = null;
+            if ($hasEn1 && !empty($r->display_name_en)) $en = $r->display_name_en;
+            if (!$en && $hasEn2 && !empty($r->name_en)) $en = $r->name_en;
+
+            return [
+                'id' => (string)$r->id,
+                'display_name' => $r->display_name, // Nepali (shown always)
+                'name_en' => $en,                   // English (optional)
+                'gender' => $r->gender ?: 'unknown',
+                'pusta'  => $r->pusta,
+            ];
+        });
+
+        return response()->json($mapped->values());
     }
 
-    // --- Hierarchical tree (for D3 tree layout) ---
+    /** First person (elder) of a pusta => used by ▲/▼ buttons */
+    public function firstPersonByPusta(Request $request)
+    {
+        $pusta = trim($request->query('pusta', ''));
+        if ($pusta === '') return response()->json(null);
+
+        $person = Person::query()
+            ->where('pusta', $pusta)
+            ->orderByRaw('CASE WHEN birth_date IS NULL THEN 1 ELSE 0 END, birth_date ASC')
+            ->orderBy('id')
+            ->first(['id', 'display_name', 'gender', 'pusta']);
+
+        return response()->json($person);
+    }
+
+    /** Click detail panel */
+    public function personShow(Person $person)
+    {
+        $person->load([
+            'parents:id,display_name,gender,pusta',
+            'children:id,display_name,gender,pusta',
+        ]);
+
+        return response()->json([
+            'id' => (string)$person->id,
+            'display_name' => $person->display_name,
+            'gender' => $person->gender ?: 'unknown',
+            'pusta' => $person->pusta,
+            'bio' => $person->bio ?? null,
+            'photo_path' => $person->photo_path ?? null,
+            'is_deceased' => (bool)($person->is_deceased ?? false),
+            'birth_date' => $person->birth_date ? $person->birth_date->format('Y-m-d') : null,
+            'death_date' => $person->death_date ? $person->death_date->format('Y-m-d') : null,
+            'parents' => ($person->parents ?? collect())->map(fn($p)=>[
+                'id'=>(string)$p->id,'display_name'=>$p->display_name,'gender'=>$p->gender,'pusta'=>$p->pusta
+            ])->values(),
+            'children' => ($person->children ?? collect())->map(fn($c)=>[
+                'id'=>(string)$c->id,'display_name'=>$c->display_name,'gender'=>$c->gender,'pusta'=>$c->pusta
+            ])->values(),
+        ]);
+    }
+
+    /** Tree JSON (depth = generation) */
     public function treeJson(Request $request)
     {
-        $rootId   = (int)($request->query('root_id') ?? 0);
-        $maxDepth = (int)($request->query('depth') ?? 1000);
+        $rootId = (int)($request->query('root_id') ?: 0);
+        $depth  = (int)($request->query('depth') ?: 5);
 
         if (!$rootId) {
-            $rootId = Person::query()->orderBy('id')->value('id') ?? 0;
+            $rootId = (int)(Person::query()->orderBy('id')->value('id') ?? 0);
             if (!$rootId) return response()->json([]);
         }
 
-        // Load once — include pusta here so the node carries it
         $people = Person::query()
-            ->select('id','display_name','gender','is_deceased','birth_date','death_date','photo_path','pusta') // ← added pusta
-            ->get()->keyBy('id');
+            ->select('id', 'display_name', 'gender', 'pusta')
+            ->get()
+            ->keyBy('id');
 
-        // children by parent (birth/adoption)
         $edges = ParentChildEdge::query()
-            ->select('parent_id','child_id','relation_type')
+            ->select('parent_id', 'child_id', 'relation_type')
+            ->whereIn('relation_type', ['birth', 'adoption'])
             ->get();
 
         $childrenByParent = [];
         foreach ($edges as $e) {
-            if (!in_array($e->relation_type, ['birth','adoption'])) continue;
             $childrenByParent[$e->parent_id][] = $e->child_id;
         }
 
-        // spouses (for badge/tooltip)
-        $unions = UnionModel::query()
-            ->select('id','spouse1_id','spouse2_id','start_date')
-            ->get();
-
-        $spousesByPerson = [];
-        foreach ($unions as $u) {
-            $spousesByPerson[$u->spouse1_id][] = $u->spouse2_id;
-            $spousesByPerson[$u->spouse2_id][] = $u->spouse1_id;
-        }
-
         $visited = [];
-        $build = function ($pid, $level = 0) use (&$build, &$visited, $maxDepth, $people, $childrenByParent, $spousesByPerson) {
-            if (isset($visited[$pid]) || !isset($people[$pid])) return null;
+
+        $build = function ($pid, $level = 0) use (&$build, &$visited, $depth, $people, $childrenByParent) {
+            if (!isset($people[$pid])) return null;
+            if (isset($visited[$pid])) return null;
             $visited[$pid] = true;
 
             $p = $people[$pid];
 
             $node = [
-                'id'          => (string)$p->id,
-                'type'        => 'person',
-                'name'        => $p->display_name,
-                'gender'      => $p->gender,
-                'is_deceased' => (bool)$p->is_deceased,
-                'birth_date'  => optional($p->birth_date)->format('Y-m-d'),
-                'death_date'  => optional($p->death_date)->format('Y-m-d'),
-                'pusta'       => $p->pusta, // ← included here for the circle label
-                'photo'       => $p->photo_path,
-                'spouses'     => array_values(array_unique(array_map(function ($sid) use ($people) {
-                    return $people[$sid]->display_name ?? null;
-                }, $spousesByPerson[$p->id] ?? []))),
-                'children'    => [],
+                'id' => (string)$p->id,
+                'name' => $p->display_name,
+                'gender' => $p->gender ?: 'unknown',
+                'pusta' => $p->pusta,
+                'children' => [],
             ];
 
-            if ($level < $maxDepth) {
+            if ($level < $depth) {
                 foreach ($childrenByParent[$p->id] ?? [] as $cid) {
                     $child = $build($cid, $level + 1);
                     if ($child) $node['children'][] = $child;
@@ -287,13 +182,6 @@ public function peopleByPusta(Request $request)
             return $node;
         };
 
-        $root = $build($rootId, 0);
-
-        return response()->json($root ?: []);
-    }
-
-    public function committee()
-    {
-        return view('committee');
+        return response()->json($build($rootId, 0) ?: []);
     }
 }

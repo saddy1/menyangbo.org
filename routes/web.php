@@ -22,20 +22,14 @@ Route::get('/sujhav/thanks', [FeedbackController::class,'thanks'])->name('feedba
 
 
 
-
 Route::get('/वशावलि', [TreeController::class, 'index'])->name('tree.index');
-Route::get('/people/search', [TreeController::class, 'searchPeople'])->name('people.search');     // name+pusta filter
-Route::get('/people/by-pusta', [TreeController::class, 'peopleByPusta'])->name('people.byPusta'); // list people in a pusta
-
-
-Route::get('/graph', [TreeController::class, 'graph'])->name('tree.graph');
-Route::get('/कार्यसमिति', [TreeController::class, 'committee'])->name('committee.index');
-
 Route::get('/tree-json', [TreeController::class, 'treeJson'])->name('tree.json');
 
-Route::get('/person/{person}', [PersonController::class, 'show'])->name('person.show'); // JSON
-Route::post('/person', [PersonController::class, 'store'])->name('person.store');
-Route::put('/person/{person}', [PersonController::class, 'update'])->name('person.update');
+Route::get('/people/search', [TreeController::class, 'searchPeople'])->name('people.search');
+Route::get('/people/first-by-pusta', [TreeController::class, 'firstPersonByPusta'])->name('people.firstByPusta');
+
+Route::get('/person/{person}', [TreeController::class, 'personShow'])->name('person.show');
+Route::get('/कार्यसमिति', [TreeController::class, 'committee'])->name('committee.index');
 
 
 Route::group(['middleware' => 'admin.auth'], routes: function () {

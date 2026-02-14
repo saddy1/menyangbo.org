@@ -11,19 +11,25 @@
     @php return; @endphp
   @endif
 
-  <div x-data="treePage()" x-init="init({{ $root->id }})" class="space-y-5 p-4 sm:p-10 lg:p-14">
+  <div
+    x-data="treePage(@json($pustas->values()))"
+    x-init="init({{ (int)$root->id }})"
+    class="space-y-5 p-4 sm:p-10 lg:p-14"
+  >
     <!-- Heading -->
     <div>
       <h2 class="text-xl sm:text-2xl font-semibold">थिन्दोलुङ खोॽयाहाङ मेन्याङबो वंशावली</h2>
       <div class="text-sm sm:text-base mt-1">
-        हालको जरा: <span class="text-emerald-600 font-medium" x-text="currentRootName || '{{ $root->display_name }}'"></span>
+        हालको जरा:
+        <span class="text-emerald-600 font-medium" x-text="currentRootName || '{{ $root->display_name }}'"></span>
       </div>
     </div>
 
-    <!-- Pusta search (Nepali or English digits) + populate people dropdown + draw -->
+    <!-- Controls box -->
     <div class="rounded-xl border bg-white p-4 shadow-sm">
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
-        <!-- Pusta input -->
+      <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+
+        <!-- Pusta -->
         <div>
           <label class="block text-xs text-slate-600 mb-1">पुस्ता (ने/अं)</label>
           <input
@@ -31,34 +37,43 @@
             type="text"
             placeholder="उदा: ५ / 5"
             class="w-full rounded-lg border px-3 py-2 text-sm"
-            @keyup.enter="loadPeopleByPusta()">
+            @keyup.enter="loadPeopleByPusta()"
+          >
         </div>
 
-        <!-- Root select (filled from pusta) + Show -->
+        <!-- Realtime name search -->
+        <div>
+          <label class="block text-xs text-slate-600 mb-1">Search name (AJAX)</label>
+          <input
+            type="text"
+            class="w-full rounded-lg border px-3 py-2 text-sm"
+            placeholder="Type name…"
+            @input="onSearchKey($event.target.value)"
+          >
+        </div>
+
+        <!-- Root select -->
         <div class="sm:col-span-2">
-          <div class="flex items-end gap-2 flex-wrap">
-            <div class="min-w-[220px] grow">
-              <label class="block text-xs text-slate-600 mb-1">जरा परिवर्तन:</label>
-              <select x-ref="rootSel" class="border rounded-lg px-3 py-2 w-full">
-                {{-- initial list = all people (server) --}}
-                @foreach ($allPeople as $p)
-                  <option value="{{ $p->id }}" @selected(request('root_id', $root->id) == $p->id)>{{ $p->display_name }}</option>
-                @endforeach
-              </select>
-            </div>
-            <button
-              class="px-4 py-2 rounded-lg bg-slate-700 text-white text-sm"
-              @click="loadPeopleByPusta()">
+          <label class="block text-xs text-slate-600 mb-1">जरा परिवर्तन:</label>
+          <div class="flex gap-2 flex-wrap">
+            <select x-ref="rootSel" class="border rounded-lg px-3 py-2 grow min-w-[240px]">
+              @foreach ($allPeople as $p)
+                <option value="{{ $p->id }}" @selected(request('root_id', $root->id) == $p->id)>
+                  {{ $p->display_name }}
+                </option>
+              @endforeach
+            </select>
+
+            <button class="px-4 py-2 rounded-lg bg-slate-700 text-white text-sm" @click="loadPeopleByPusta()">
               सूची देखाउने
             </button>
-            <button
-              class="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm"
-              @click="drawFromSelect()">
+
+            <button class="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm" @click="drawFromSelect()">
               हेर्नुहोस्
             </button>
           </div>
 
-          <!-- status row -->
+          <!-- status -->
           <div class="mt-2 text-xs">
             <span x-show="loading" class="text-slate-500" x-cloak>खोज्दै…</span>
             <span x-show="error" class="text-rose-600" x-text="error" x-cloak></span>
@@ -68,11 +83,19 @@
       </div>
     </div>
 
-    <!-- Legend + Controls -->
+    <!-- Control row -->
     <div class="flex items-center gap-2 overflow-x-auto no-scrollbar -mx-1 px-1">
       <button class="shrink-0 px-3 py-1.5 rounded-lg border hover:bg-slate-50 text-sm" @click="zoomIn()">＋ Zoom In</button>
       <button class="shrink-0 px-3 py-1.5 rounded-lg border hover:bg-slate-50 text-sm" @click="zoomOut()">－ Zoom Out</button>
       <button class="shrink-0 px-3 py-1.5 rounded-lg border hover:bg-slate-50 text-sm" @click="fitToScreen()">Fit</button>
+
+      <button class="shrink-0 px-3 py-1.5 rounded-lg border hover:bg-slate-50 text-sm" @click="pan(0,-140)">↑</button>
+      <button class="shrink-0 px-3 py-1.5 rounded-lg border hover:bg-slate-50 text-sm" @click="pan(-140,0)">←</button>
+      <button class="shrink-0 px-3 py-1.5 rounded-lg border hover:bg-slate-50 text-sm" @click="pan(140,0)">→</button>
+      <button class="shrink-0 px-3 py-1.5 rounded-lg border hover:bg-slate-50 text-sm" @click="pan(0,140)">↓</button>
+
+      <button class="shrink-0 px-3 py-1.5 rounded-lg border hover:bg-slate-50 text-sm" @click="prevPusta()">← Prev पुस्ता</button>
+      <button class="shrink-0 px-3 py-1.5 rounded-lg border hover:bg-slate-50 text-sm" @click="nextPusta()">Next पुस्ता →</button>
 
       <div class="ml-auto text-xs text-slate-600 flex items-center gap-3 sm:gap-4">
         <span class="inline-flex items-center gap-1 shrink-0">
@@ -90,8 +113,8 @@
       </div>
     </div>
 
-    <!-- Tree container -->
-    <div class="relative bg-white border rounded-xl shadow-sm overflow-hidden w-full" x-ref="wrap">
+    <!-- Tree container (scrollable!) -->
+    <div class="relative bg-white border rounded-xl shadow-sm overflow-auto w-full" x-ref="wrap">
       <div class="md:hidden" style="height: calc(100dvh - 12rem);"></div>
       <div class="hidden md:block" style="height: 72vh;"></div>
 
@@ -103,16 +126,18 @@
       </svg>
     </div>
 
-    <!-- Detail Drawer -->
+    <!-- Drawer -->
     <div x-show="open" x-transition.opacity class="fixed inset-0 z-50" style="display:none">
       <div class="absolute inset-0 bg-black/30" @click="open=false"></div>
+
       <div class="absolute right-0 top-0 h-full w-full sm:w-[420px] bg-white shadow-xl p-5 overflow-y-auto"
-           x-transition:enter="transition ease-out duration-200"
-           x-transition:enter-start="translate-x-full opacity-0"
-           x-transition:enter-end="translate-x-0 opacity-100"
-           x-transition:leave="transition ease-in duration-150"
-           x-transition:leave-start="translate-x-0 opacity-100"
-           x-transition:leave-end="translate-x-full opacity-0">
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="translate-x-full opacity-0"
+        x-transition:enter-end="translate-x-0 opacity-100"
+        x-transition:leave="transition ease-in duration-150"
+        x-transition:leave-start="translate-x-0 opacity-100"
+        x-transition:leave-end="translate-x-full opacity-0"
+      >
         <div class="flex items-center justify-between mb-4">
           <h3 class="text-lg font-semibold">व्यक्ति विवरण</h3>
           <button class="text-slate-500 hover:text-slate-700" @click="open=false">✕</button>
@@ -120,7 +145,7 @@
 
         <template x-if="person">
           <div class="space-y-4">
-            <div class="flex flex-col sm:flex-row items-start gap-4 p-4 bg-white rounded-xl shadow-sm border border-slate-200">
+            <div class="flex items-start gap-4 p-4 bg-white rounded-xl shadow-sm border border-slate-200">
               <div class="w-20 h-20 rounded-full bg-slate-200 overflow-hidden flex-shrink-0">
                 <template x-if="person.photo_path">
                   <img :src="asset(person.photo_path)" class="w-full h-full object-cover" />
@@ -132,6 +157,7 @@
 
               <div class="flex-1">
                 <div class="font-bold text-xl text-slate-800 mb-2" x-text="person.display_name"></div>
+
                 <div class="grid grid-cols-2 gap-4">
                   <div class="text-slate-600 text-sm">
                     <div class="mb-1">
@@ -143,9 +169,9 @@
                       <span x-text="person.is_deceased ? dateNE(person.death_date) : '—'"></span>
                     </div>
                   </div>
-                  <div class="px-4 sm:text-right md:text-right text-slate-600 text-sm">
+                  <div class="text-right text-slate-600 text-sm">
                     <div class="font-semibold mb-1">पुस्ता</div>
-                    <div class="text-lg font-bold text-slate-800" x-text="(person.pusta) || '—'"></div>
+                    <div class="text-lg font-bold text-slate-800" x-text="person.pusta || '—'"></div>
                   </div>
                 </div>
               </div>
@@ -160,7 +186,9 @@
               <div class="text-sm font-semibold mb-1">अभिभावक</div>
               <ul class="list-disc ml-5 text-sm">
                 <template x-for="pp in (person.parents || [])" :key="pp.id">
-                  <li><button class="text-emerald-700 hover:underline" @click="openPerson(pp.id)" x-text="pp.display_name"></button></li>
+                  <li>
+                    <button class="text-emerald-700 hover:underline" @click="openPerson(pp.id)" x-text="pp.display_name"></button>
+                  </li>
                 </template>
               </ul>
             </div>
@@ -169,7 +197,9 @@
               <div class="text-sm font-semibold mb-1">सन्तान</div>
               <ul class="list-disc ml-5 text-sm">
                 <template x-for="cc in (person.children || [])" :key="cc.id">
-                  <li><button class="text-emerald-700 hover:underline" @click="openPerson(cc.id)" x-text="cc.display_name"></button></li>
+                  <li>
+                    <button class="text-emerald-700 hover:underline" @click="openPerson(cc.id)" x-text="cc.display_name"></button>
+                  </li>
                 </template>
               </ul>
             </div>
@@ -181,25 +211,32 @@
 
   {{-- D3 v7 --}}
   <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+
   <script>
-    function treePage() {
+    function treePage(pustasList = []) {
       const genderColor = g => ({ male:'#2563eb', female:'#db2777', other:'#7c3aed', unknown:'#64748b' }[g] || '#64748b');
 
-      // Nepali ↔ English digit maps
       const NE2EN = {'०':'0','१':'1','२':'2','३':'3','४':'4','५':'5','६':'6','७':'7','८':'8','९':'9'};
       const EN2NE = {'0':'०','1':'१','2':'२','3':'३','4':'४','5':'५','6':'६','7':'७','8':'८','9':'९'};
       const toEN = s => (String(s||'')).replace(/[०-९]/g, d => NE2EN[d] || d);
       const toNE = s => (String(s||'')).replace(/[0-9]/g, d => EN2NE[d] || d);
 
       return {
-        // UI state
+        // state
         loading:false, error:'', info:'', currentRootName:null,
 
-        // Drawer
+        // drawer
         open:false, person:null,
 
-        // D3 refs
+        // d3 refs
         svg:null, wrap:null, zoomLayer:null, linksG:null, nodesG:null, zoomBehavior:null,
+
+        // debounced search
+        _timer:null,
+        _doSearch:null,
+
+        // pustas list
+        pustas: (pustasList || []).map(v => String(v)),
 
         init(initialRootId){
           this.wrap = this.$refs.wrap;
@@ -208,20 +245,114 @@
           this.linksG = d3.select(this.$refs.links);
           this.nodesG = d3.select(this.$refs.nodes);
 
-          this.zoomBehavior = d3.zoom().scaleExtent([0.2, 3]).on('zoom', (ev) => this.zoomLayer.attr('transform', ev.transform));
+          this.zoomBehavior = d3.zoom()
+            .scaleExtent([0.2, 3])
+            .on('zoom', (ev) => this.zoomLayer.attr('transform', ev.transform));
+
           this.svg.call(this.zoomBehavior).on('dblclick.zoom', null);
 
           this.loadTree(initialRootId);
           window.addEventListener('resize', () => this.fitToScreen());
         },
 
-        // 1) Read पुस्‍ता (Nepali/English), fetch people, replace dropdown options
+        debounce(fn, wait = 250){
+          return (...args) => {
+            clearTimeout(this._timer);
+            this._timer = setTimeout(() => fn(...args), wait);
+          };
+        },
+
+        genderIcon(g){
+          if(g === 'male') return '♂';
+          if(g === 'female') return '♀';
+          return '⚧';
+        },
+
+        // --- pusta helpers ---
+        currentPusta(){
+          const raw = (this.$refs.pustaInput?.value || '').trim();
+          const pEN = toEN(raw).replace(/\D/g,'');
+          return pEN || null;
+        },
+
+        async nextPusta(){
+          const cur = this.currentPusta();
+          if(!cur || !this.pustas.length) return;
+
+          const i = this.pustas.indexOf(String(cur));
+          if(i === -1 || i >= this.pustas.length - 1) return;
+
+          const nxt = this.pustas[i+1];
+          this.$refs.pustaInput.value = toNE(nxt);
+          await this.loadPeopleByPusta();
+        },
+
+        async prevPusta(){
+          const cur = this.currentPusta();
+          if(!cur || !this.pustas.length) return;
+
+          const i = this.pustas.indexOf(String(cur));
+          if(i <= 0) return;
+
+          const prv = this.pustas[i-1];
+          this.$refs.pustaInput.value = toNE(prv);
+          await this.loadPeopleByPusta();
+        },
+
+        // --- realtime search ---
+        onSearchKey(value){
+          const term = (value || '').trim();
+
+          if(!this._doSearch){
+            this._doSearch = this.debounce(async (t) => {
+              if(!t){
+                this.info = '';
+                return;
+              }
+              try{
+                this.error = '';
+                const url = new URL(@json(route('people.search')), window.location.origin);
+                url.searchParams.set('term', t);
+
+                const r = await fetch(url);
+                if(!r.ok) throw new Error('HTTP ' + r.status);
+                const rows = await r.json();
+
+                const sel = this.$refs.rootSel;
+                sel.innerHTML = '';
+
+                if(Array.isArray(rows) && rows.length){
+                  for(const p of rows){
+                    const opt = document.createElement('option');
+                    opt.value = p.id;
+                    opt.textContent = (p.display_name || ('ID '+p.id)) + (p.pusta ? ` (पु.${p.pusta})` : '');
+                    sel.appendChild(opt);
+                  }
+                  this.info = `${rows.length} result(s)`;
+                }else{
+                  const opt = document.createElement('option');
+                  opt.value = '';
+                  opt.textContent = 'No results';
+                  sel.appendChild(opt);
+                  this.info = 'No results';
+                }
+              }catch(e){
+                console.error(e);
+                this.error = 'Search failed';
+              }
+            }, 250);
+          }
+
+          this._doSearch(term);
+        },
+
+        // --- load people by pusta ---
         async loadPeopleByPusta(){
           this.error=''; this.info=''; this.loading=true;
 
-          // Read input and normalize to EN digits
           const raw = (this.$refs.pustaInput?.value || '').trim();
-          const pustaEN = toEN(raw).replace(/\D/g,'');  // digits only
+          const pustaEN = toEN(raw).replace(/\D/g,'');
+
           if(!pustaEN){
             this.loading=false;
             this.error = 'पुस्ता भर्नुहोस् (उदा: ५ वा 5)';
@@ -229,15 +360,16 @@
           }
 
           try{
-            const url = new URL('{{ route('people.byPusta') }}', window.location.origin);
+            const url = new URL(@json(route('people.byPusta')), window.location.origin);
             url.searchParams.set('pusta', pustaEN);
+
             const r = await fetch(url);
             if(!r.ok) throw new Error('HTTP '+r.status);
             const people = await r.json();
 
-            // Replace dropdown options with fetched people
             const sel = this.$refs.rootSel;
             sel.innerHTML = '';
+
             if(Array.isArray(people) && people.length){
               for(const p of people){
                 const opt = document.createElement('option');
@@ -261,28 +393,35 @@
           }
         },
 
-        // 2) Draw tree from the current select
         drawFromSelect(){
           const sel = this.$refs.rootSel;
           const id = sel?.value;
           const label = sel?.selectedOptions?.[0]?.textContent || null;
+
           if(!id){
             this.error = 'कृपया सूचीबाट व्यक्ति छान्नुहोस्।';
             return;
           }
+
           this.error = '';
           this.currentRootName = label;
           this.loadTree(id);
           this.$nextTick(() => this.wrap?.scrollIntoView({behavior:'smooth', block:'start'}));
         },
 
-        // Tree drawing
         async loadTree(rootId){
           try{
-            const res = await fetch(`/tree-json?root_id=${rootId}`);
+            const url = new URL(@json(route('tree.json')), window.location.origin);
+            url.searchParams.set('root_id', rootId);
+
+            const res = await fetch(url);
             if(!res.ok) throw new Error(`HTTP ${res.status}`);
+
             const rootData = await res.json();
-            if(!rootData || !rootData.id){ this.clear(); return; }
+            if(!rootData || !rootData.id){
+              this.clear();
+              return;
+            }
             this.drawTree(rootData);
           }catch(e){
             console.error(e);
@@ -298,8 +437,28 @@
         drawTree(rootData){
           this.clear();
 
+          // Arrow defs
+          this.svg.select('defs').remove();
+          const defs = this.svg.append('defs');
+          defs.append('marker')
+            .attr('id', 'arrowhead')
+            .attr('viewBox', '0 -5 10 10')
+            .attr('refX', 10)
+            .attr('refY', 0)
+            .attr('markerWidth', 6)
+            .attr('markerHeight', 6)
+            .attr('orient', 'auto')
+            .append('path')
+            .attr('d', 'M0,-5L10,0L0,5')
+            .attr('fill', '#cbd5e1');
+
           const root = d3.hierarchy(rootData, d => d.children);
-          const treeLayout = d3.tree().nodeSize([80, 140]).separation((a,b) => (a.parent === b.parent ? 1 : 1.5));
+
+          // more spacing to avoid “diminished”
+          const treeLayout = d3.tree()
+            .nodeSize([120, 200])
+            .separation((a,b) => (a.parent === b.parent ? 1 : 1.4));
+
           treeLayout(root);
 
           const linkGen = d3.linkVertical().x(d => d.x).y(d => d.y);
@@ -311,6 +470,7 @@
             .attr('fill','none')
             .attr('stroke','#cbd5e1')
             .attr('stroke-width',1.5)
+            .attr('marker-end', 'url(#arrowhead)')
             .attr('d', linkGen)
             .attr('opacity', 0)
             .transition().duration(300).attr('opacity',1);
@@ -324,14 +484,14 @@
             .style('cursor','pointer');
 
           node.attr('tabindex', 0)
-              .on('click', (_, d) => this.openPerson(d.data.id))
-              .on('keydown', (ev, d) => { if (ev.key === 'Enter' || ev.key === ' ') this.openPerson(d.data.id) });
+            .on('click', (_, d) => this.openPerson(d.data.id))
+            .on('keydown', (ev, d) => { if (ev.key === 'Enter' || ev.key === ' ') this.openPerson(d.data.id) });
 
           node.attr('opacity', 0).transition().duration(250).attr('opacity', 1);
 
           // hitbox
           node.append('circle')
-            .attr('r', 22)
+            .attr('r', 26)
             .attr('fill', 'transparent')
             .attr('stroke', 'transparent')
             .style('pointer-events', 'all');
@@ -343,7 +503,16 @@
             .attr('stroke', d => d.data.is_deceased ? '#f43f5e' : '#e2e8f0')
             .attr('stroke-width', d => d.data.is_deceased ? 3 : 1.5);
 
-          // pusta inside circle (white)
+          // gender icon above
+          node.append('text')
+            .attr('text-anchor','middle')
+            .attr('y', -22)
+            .attr('font-size','12px')
+            .attr('font-weight','800')
+            .attr('fill','#0f172a')
+            .text(d => this.genderIcon(d.data.gender));
+
+          // pusta inside circle
           node.append('text')
             .attr('text-anchor','middle')
             .attr('dy','0.35em')
@@ -353,22 +522,33 @@
             .text(d => d.data.pusta ? 'पु.' + d.data.pusta : '')
             .attr('display', d => d.data.pusta ? null : 'none');
 
-          // name below
+          // text background card
+          node.append('rect')
+            .attr('x', -80)
+            .attr('y', 18)
+            .attr('width', 160)
+            .attr('height', 46)
+            .attr('rx', 12)
+            .attr('fill', '#ffffff')
+            .attr('stroke', '#e2e8f0');
+
+          // name
           node.append('text')
-            .attr('y', 30)
+            .attr('y', 38)
             .attr('text-anchor','middle')
             .attr('font-size','11px')
+            .attr('font-weight','700')
             .attr('fill','#0f172a')
-            .text(d => d.data.name.length > 16 ? d.data.name.slice(0,15)+'…' : d.data.name);
+            .text(d => (d.data.name || '').length > 18 ? d.data.name.slice(0,17)+'…' : d.data.name);
 
-          // spouse below
+          // spouse
           node.append('text')
-            .attr('y', 45)
+            .attr('y', 54)
             .attr('text-anchor','middle')
             .attr('font-size','10px')
             .attr('fill','#475569')
             .text(d => (d.data.spouses && d.data.spouses.length)
-              ? ('+' + (d.data.spouses[0].length>16 ? d.data.spouses[0].slice(0,15)+'…' : d.data.spouses[0]))
+              ? ('+' + ((d.data.spouses[0] || '').length > 18 ? d.data.spouses[0].slice(0,17)+'…' : d.data.spouses[0]))
               : '');
 
           this.$nextTick(() => this.fitToScreen());
@@ -376,36 +556,51 @@
 
         zoomIn(){ this.svg.transition().duration(200).call(this.zoomBehavior.scaleBy, 1.2); },
         zoomOut(){ this.svg.transition().duration(200).call(this.zoomBehavior.scaleBy, 0.8); },
-        resetZoom(){ this.svg.transition().duration(250).call(this.zoomBehavior.transform, d3.zoomIdentity); },
+
+        pan(dx, dy){
+          const t = d3.zoomTransform(this.$refs.svg);
+          const next = d3.zoomIdentity.translate(t.x + dx, t.y + dy).scale(t.k);
+          this.svg.transition().duration(150).call(this.zoomBehavior.transform, next);
+        },
+
+        resetZoom(){
+          this.svg.transition().duration(250).call(this.zoomBehavior.transform, d3.zoomIdentity);
+        },
 
         fitToScreen(){
           const g = this.$refs.zoomLayer;
           if(!g) return;
+
           const bbox = g.getBBox();
           if (!isFinite(bbox.width) || bbox.width === 0) return this.resetZoom();
 
           const rect = this.wrap.getBoundingClientRect();
           const w = rect.width, h = rect.height;
-          const scale = Math.min(1.0, 0.9 * Math.min(w / bbox.width, h / bbox.height));
+
+          const scale = Math.min(1.0, 0.92 * Math.min(w / bbox.width, h / bbox.height));
           const tx = (w - bbox.width * scale) / 2 - bbox.x * scale;
           const ty = (h - bbox.height * scale) / 2 - bbox.y * scale;
+
           this.svg.transition().duration(350).call(
             this.zoomBehavior.transform,
             d3.zoomIdentity.translate(tx, ty).scale(scale)
           );
         },
 
-        asset(p){ return p ? `/${p}` : ''; },
+        asset(p){ return p ? `/${String(p).replace(/^\/+/, '')}` : ''; },
+
         dateNE(d){
           if(!d) return '—';
-          const s = new Date(d).toISOString().slice(0,10);
+          const s = String(d).slice(0,10);
           return s.replace(/[0-9]/g, ch => EN2NE[ch] ?? ch);
         },
 
         async openPerson(id){
           try{
-            const r = await fetch(`/person/${id}`);
+            const url = new URL(@json(url('/person')) + `/${id}`, window.location.origin);
+            const r = await fetch(url);
             if(!r.ok) throw new Error(`HTTP ${r.status}`);
+
             this.person = await r.json();
             this.open = true;
           }catch(e){
@@ -413,7 +608,7 @@
             alert('लोड हुन सकेन।');
           }
         }
-      }
+      };
     }
   </script>
 @endsection
