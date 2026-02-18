@@ -10,14 +10,55 @@ use Illuminate\Validation\Rule;
 
 class RelationshipController extends Controller
 {
-    public function index(Request $request)
-    {
-        $people = Person::orderByDesc('id')->get(['id','display_name','birth_date']);
-        $edges = ParentChildEdge::with(['parent:id,display_name,birth_date','child:id,display_name,birth_date'])
-                ->orderByDesc('id',)->paginate(20);
+ public function index(Request $request)
+{
+    $q = trim($request->query('q', ''));
+    $type = trim($request->query('type', ''));
 
-        return view('admin.relationships.index', compact('people', 'edges'));
-    }
+    // people list for dropdowns
+    $people = Person::orderBy('display_name')
+        ->get(['id','display_name','member_no','pusta']);
+
+    $edges = ParentChildEdge::query()
+        ->with([
+            'parent:id,display_name,display_name_np,member_no,pusta,birth_date',
+            'child:id,display_name,display_name_np,member_no,pusta,birth_date',
+        ])
+        ->when($type !== '', fn($qq) => $qq->where('relation_type', $type))
+        ->when($q !== '', function ($qq) use ($q) {
+            $term = $q;
+
+            // allow "#DLUMP01" (member no)
+            if (str_starts_with($term, '#')) $term = ltrim($term, '#');
+
+            // allow "pusta:3"
+            if (preg_match('/^pusta\s*:\s*(\d+)$/i', $term, $m)) {
+                $p = $m[1];
+                return $qq->whereHas('parent', fn($pQ) => $pQ->where('pusta', $p))
+                          ->orWhereHas('child', fn($cQ) => $cQ->where('pusta', $p));
+            }
+
+            return $qq->where(function ($w) use ($term) {
+                $w->whereHas('parent', function ($pQ) use ($term) {
+                    $pQ->where('display_name', 'like', "%{$term}%")
+                       ->orWhere('display_name_np', 'like', "%{$term}%")
+                       ->orWhere('member_no', 'like', "%{$term}%")
+                       ->orWhere('pusta', 'like', "%{$term}%");
+                })->orWhereHas('child', function ($cQ) use ($term) {
+                    $cQ->where('display_name', 'like', "%{$term}%")
+                       ->orWhere('display_name_np', 'like', "%{$term}%")
+                       ->orWhere('member_no', 'like', "%{$term}%")
+                       ->orWhere('pusta', 'like', "%{$term}%");
+                });
+            });
+        })
+        ->orderByDesc('id')
+        ->paginate(20)
+        ->withQueryString();
+
+    return view('admin.relationships.index', compact('people','edges','q','type'));
+}
+
 
     public function store(Request $request)
     {

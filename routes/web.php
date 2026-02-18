@@ -9,15 +9,20 @@ use App\Http\Controllers\Admin\RelationshipController;
 use App\Http\Controllers\Admin\UnionController;
 use SebastianBergmann\CodeCoverage\Report\Html\Dashboard;
 use App\Http\Controllers\FeedbackController;
+use App\Http\Controllers\PersonChangeRequestController;
+use App\Http\Controllers\Admin\PeopleTableController;
+use App\Http\Controllers\Admin\PersonChangeRequestController as AdminReq;
 
+Route::post('/person-change-requests', [PersonChangeRequestController::class, 'store'])
+    ->name('person.requests.store');
 
-Route::get('/',[DashboardController::class, 'home'])->name('home');
+Route::get('/', [DashboardController::class, 'home'])->name('home');
 Route::get('/admin', [DashboardController::class, 'showadminform'])->name('admin.login.form');
 Route::post('/login/admin', [DashboardController::class, 'adminLogin'])->name('admin.login');
 
-Route::get('/sujhav', [FeedbackController::class,'create'])->name('feedback.create');
-Route::post('/sujhav', [FeedbackController::class,'store'])->name('feedback.store')->middleware('throttle:10,1');
-Route::get('/sujhav/thanks', [FeedbackController::class,'thanks'])->name('feedback.thanks');
+Route::get('/sujhav', [FeedbackController::class, 'create'])->name('feedback.create');
+Route::post('/sujhav', [FeedbackController::class, 'store'])->name('feedback.store')->middleware('throttle:10,1');
+Route::get('/sujhav/thanks', [FeedbackController::class, 'thanks'])->name('feedback.thanks');
 
 
 
@@ -31,6 +36,14 @@ Route::get('/people/first-by-pusta', [TreeController::class, 'firstPersonByPusta
 Route::get('/person/{person}', [TreeController::class, 'personShow'])->name('person.show');
 Route::get('/कार्यसमिति', [TreeController::class, 'committee'])->name('committee.index');
 
+
+
+Route::get('/member/{person}', [TreeController::class, 'memberPage'])->name('member.page');
+
+
+
+Route::get('/members', [PeopleTableController::class, 'index'])->name('admin.people.directory');
+    Route::get('/members/json', [PeopleTableController::class, 'all'])->name('admin.people.directory.all');
 
 Route::group(['middleware' => 'admin.auth'], routes: function () {
 
@@ -58,10 +71,19 @@ Route::group(['middleware' => 'admin.auth'], routes: function () {
 
 
 
-        Route::get('/admin/feedback', [FeedbackController::class,'adminIndex'])->name('feedback.index');
-    Route::get('/admin/feedback/{feedback}', [FeedbackController::class,'adminShow'])->name('feedback.show');
-    Route::delete('/admin/feedback/{feedback}', [FeedbackController::class,'destroy'])->name('feedback.destroy');
+        Route::get('/admin/feedback', [FeedbackController::class, 'adminIndex'])->name('feedback.index');
+        Route::get('/admin/feedback/{feedback}', [FeedbackController::class, 'adminShow'])->name('feedback.show');
+        Route::delete('/admin/feedback/{feedback}', [FeedbackController::class, 'destroy'])->name('feedback.destroy');
 
         Route::post('/logout', action: [DashboardController::class, 'logout'])->name('logout');
+
+
+
+
     });
+
+     Route::get('/person-requests', [AdminReq::class, 'index'])->name('admin.person.requests.index');
+    Route::post('/person-requests/{id}/approve', [AdminReq::class, 'approve'])->name('admin.person.requests.approve');
+    Route::post('/person-requests/{id}/reject', [AdminReq::class, 'reject'])->name('admin.person.requests.reject');
 });
+

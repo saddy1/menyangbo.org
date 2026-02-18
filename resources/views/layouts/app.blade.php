@@ -49,6 +49,8 @@
                 <a href="{{ route('committee.index') }}" class="hover:text-red-300">कार्यसमिति</a>
 
                 <a href="{{ route('tree.index') }}" class="hover:text-red-300">वंशावली</a>
+                                <a href="{{ route('admin.people.directory') }}" class="hover:text-red-300">परिवार सूची</a>
+
                 <a href="{{ route('feedback.create') }}" class="text-sm hover:underline">सुझाव</a>
 
                 <a href="#" class="hover:text-red-300">सहायता</a>

@@ -33,13 +33,49 @@ class Person extends Model
     protected $table = 'persons';
 
     protected $fillable = [
-        'given_name','middle_name','family_name','display_name',
-        'gender','birth_date','death_date','is_deceased','pusta','photo_path','bio'
+        'given_name',
+        'middle_name',
+        'family_name',
+        'display_name',
+        'gender',
+        'birth_date',
+        'death_date',
+        'is_deceased',
+        'pusta',
+        'photo_path',
+        'bio',
+        'member_no',
+        'member_type',
+        'membership',
+        'display_name_np',
+        'birth_place',
+        'father_name',
+        'mother_name',
+        'address',
+        'mobile',
+        'email',
+        'education',
+        'occupation',
+        'marital_status',
+        'marriage_date_bs',
+        'marriage_date_ad',
+        'lineage',
+        'family_type',
+        'blood_group',
+        'rashifal',
+        'religion',
+        'special_note',
+        'death_place',
+        'death_tithi',
+        'death_reason',
+        'registered_by',
     ];
 
     protected $casts = [
         'birth_date'  => 'date',
         'death_date'  => 'date',
+        'marriage_date_ad' => 'date',
+
         'is_deceased' => 'boolean',
     ];
 
@@ -125,15 +161,15 @@ class Person extends Model
         if (!trim((string) $term)) return $q;
         return $q->where(function ($qq) use ($term) {
             $qq->where('display_name', 'like', "%{$term}%")
-               ->orWhere('given_name',  'like', "%{$term}%")
-               ->orWhere('family_name', 'like', "%{$term}%");
+                ->orWhere('given_name',  'like', "%{$term}%")
+                ->orWhere('family_name', 'like', "%{$term}%");
         });
     }
 
     public function scopeTiny($q)
     {
         // minimal columns for dropdowns/selects
-        return $q->select('id','display_name','birth_date','is_deceased','gender');
+        return $q->select('id', 'display_name', 'birth_date', 'is_deceased', 'gender');
     }
 
     /* -----------------------------

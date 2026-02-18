@@ -10,14 +10,60 @@ use Illuminate\Validation\Rule;
 
 class UnionController extends Controller
 {
-    public function index()
-    {
-        $people = Person::orderBy('display_name')->get(['id','display_name']);
-        $unions = UnionModel::with(['spouse1:id,display_name','spouse2:id,display_name'])
-                  ->orderByDesc('id')->paginate(20);
+public function index(Request $request)
+{
+    $q = trim($request->query('q', ''));
+    $pusta = trim($request->query('pusta', ''));
 
-        return view('admin.unions.index', compact('people','unions'));
-    }
+    // dropdown people list (keep it simple)
+    $people = Person::orderBy('display_name')
+        ->get(['id','display_name','member_no','pusta']);
+
+    $unions = UnionModel::query()
+        ->with([
+            'spouse1:id,display_name,display_name_np,member_no,pusta',
+            'spouse2:id,display_name,display_name_np,member_no,pusta',
+        ])
+        ->when($q !== '', function ($qq) use ($q) {
+            $term = $q;
+
+            // allow "pusta:3" quick search
+            if (preg_match('/^pusta\s*:\s*(\d+)$/i', $term, $m)) {
+                $p = $m[1];
+                return $qq->whereHas('spouse1', fn($s) => $s->where('pusta', $p))
+                          ->orWhereHas('spouse2', fn($s) => $s->where('pusta', $p));
+            }
+
+            // allow "#DLUMP01" style (member_no)
+            if (str_starts_with($term, '#')) {
+                $term = ltrim($term, '#');
+            }
+
+            return $qq->where(function ($w) use ($term) {
+                $w->whereHas('spouse1', function ($s) use ($term) {
+                    $s->where('display_name', 'like', "%{$term}%")
+                      ->orWhere('display_name_np', 'like', "%{$term}%")
+                      ->orWhere('member_no', 'like', "%{$term}%");
+                })->orWhereHas('spouse2', function ($s) use ($term) {
+                    $s->where('display_name', 'like', "%{$term}%")
+                      ->orWhere('display_name_np', 'like', "%{$term}%")
+                      ->orWhere('member_no', 'like', "%{$term}%");
+                });
+            });
+        })
+        ->when($pusta !== '', function ($qq) use ($pusta) {
+            $qq->where(function ($w) use ($pusta) {
+                $w->whereHas('spouse1', fn($s) => $s->where('pusta', $pusta))
+                  ->orWhereHas('spouse2', fn($s) => $s->where('pusta', $pusta));
+            });
+        })
+        ->orderByDesc('id')
+        ->paginate(20)
+        ->withQueryString();
+
+    return view('admin.unions.index', compact('people','unions','q','pusta'));
+}
+
 
     public function store(Request $request)
     {
