@@ -130,58 +130,77 @@ class TreeController extends Controller
     }
 
     /** Tree JSON (depth = generation) */
-    public function treeJson(Request $request)
-    {
-        $rootId = (int)($request->query('root_id') ?: 0);
-        $depth  = (int)($request->query('depth') ?: 5);
+public function treeJson(Request $request)
+{
+    $rootId = (int)($request->query('root_id') ?: 0);
+    $depth  = (int)($request->query('depth') ?: 5);
 
-        if (!$rootId) {
-            $rootId = (int)(Person::query()->orderBy('id')->value('id') ?? 0);
-            if (!$rootId) return response()->json([]);
-        }
-
-        $people = Person::query()
-            ->select('id', 'display_name', 'gender', 'pusta')
-            ->get()
-            ->keyBy('id');
-
-        $edges = ParentChildEdge::query()
-            ->select('parent_id', 'child_id', 'relation_type')
-            ->whereIn('relation_type', ['birth', 'adoption'])
-            ->get();
-
-        $childrenByParent = [];
-        foreach ($edges as $e) {
-            $childrenByParent[$e->parent_id][] = $e->child_id;
-        }
-
-        $visited = [];
-
-        $build = function ($pid, $level = 0) use (&$build, &$visited, $depth, $people, $childrenByParent) {
-            if (!isset($people[$pid])) return null;
-            if (isset($visited[$pid])) return null;
-            $visited[$pid] = true;
-
-            $p = $people[$pid];
-
-            $node = [
-                'id' => (string)$p->id,
-                'name' => $p->display_name,
-                'gender' => $p->gender ?: 'unknown',
-                'pusta' => $p->pusta,
-                'children' => [],
-            ];
-
-            if ($level < $depth) {
-                foreach ($childrenByParent[$p->id] ?? [] as $cid) {
-                    $child = $build($cid, $level + 1);
-                    if ($child) $node['children'][] = $child;
-                }
-            }
-
-            return $node;
-        };
-
-        return response()->json($build($rootId, 0) ?: []);
+    if (!$rootId) {
+        $rootId = (int)(Person::query()->orderBy('id')->value('id') ?? 0);
+        if (!$rootId) return response()->json([]);
     }
+
+    $people = Person::query()
+        ->select('id', 'display_name', 'gender', 'pusta', 'birth_date')
+        ->get()
+        ->keyBy('id');
+
+    $edges = ParentChildEdge::query()
+        ->select('parent_id', 'child_id', 'relation_type')
+        ->whereIn('relation_type', ['birth', 'adoption'])
+        ->get();
+
+    $childrenByParent = [];
+    foreach ($edges as $e) {
+        $childrenByParent[$e->parent_id][] = $e->child_id;
+    }
+
+    // Optional: sort children by birth_date then id (stable)
+    foreach ($childrenByParent as $pid => $childIds) {
+        usort($childIds, function ($a, $b) use ($people) {
+            $pa = $people[$a] ?? null;
+            $pb = $people[$b] ?? null;
+            if (!$pa && !$pb) return 0;
+            if (!$pa) return 1;
+            if (!$pb) return -1;
+
+            $da = $pa->birth_date ? $pa->birth_date->format('Y-m-d') : '9999-99-99';
+            $db = $pb->birth_date ? $pb->birth_date->format('Y-m-d') : '9999-99-99';
+
+            if ($da === $db) return ($pa->id <=> $pb->id);
+            return ($da <=> $db);
+        });
+        $childrenByParent[$pid] = $childIds;
+    }
+
+    $build = function ($pid, $level = 0, $stack = []) use (&$build, $depth, $people, $childrenByParent) {
+        if (!isset($people[$pid])) return null;
+
+        // prevent infinite loops only on current path
+        if (isset($stack[$pid])) return null;
+        $stack[$pid] = true;
+
+        $p = $people[$pid];
+
+        $node = [
+            'id' => (string)$p->id,
+            'name' => $p->display_name,
+            'gender' => $p->gender ?: 'unknown',
+            'pusta' => $p->pusta,
+            'children' => [],
+        ];
+
+        if ($level < $depth) {
+            foreach ($childrenByParent[$p->id] ?? [] as $cid) {
+                $child = $build($cid, $level + 1, $stack);
+                if ($child) $node['children'][] = $child;
+            }
+        }
+
+        return $node;
+    };
+
+    return response()->json($build($rootId, 0) ?: []);
+}
+
 }
