@@ -17,7 +17,7 @@
         @keyframes marquee { from { transform: translateX(100vw); } to { transform: translateX(-100%); } }
         .animate-marquee { animation: marquee 60s linear infinite; }
         .animate-marquee:hover { animation-play-state: paused; }
-        .footer-link { color: rgb(203 213 225); transition: color .18s ease, transform .18s ease; }
+        .footer-link { color: rgb(191 219 254); transition: color .18s ease, transform .18s ease; }
         .footer-link:hover { color: white; transform: translateX(3px); }
     </style>
 </head>
@@ -376,60 +376,60 @@
     </main>
 
     <!-- ═══ FOOTER ═══ -->
-    <footer class="mt-14 bg-slate-950 text-slate-200 border-t border-blue-900/40">
+    <footer class="mt-14 bg-gradient-to-br from-blue-900 to-blue-950 text-blue-50 border-t border-blue-700/50">
         <div class="relative overflow-hidden">
-            <div class="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-400 to-transparent"></div>
-            <div class="absolute -right-24 -top-24 h-64 w-64 rounded-full bg-blue-600/10 blur-3xl"></div>
-            <div class="absolute -left-24 bottom-0 h-56 w-56 rounded-full bg-red-500/10 blur-3xl"></div>
+            <div class="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-300 to-transparent"></div>
+            <div class="absolute -right-32 -top-32 h-80 w-80 rounded-full bg-blue-500/15 blur-3xl"></div>
+            <div class="absolute -left-32 -bottom-16 h-72 w-72 rounded-full bg-blue-600/15 blur-3xl"></div>
 
-            <div class="relative max-w-7xl mx-auto px-4 py-10">
-                <div class="grid gap-8 lg:grid-cols-[1.35fr_1fr_1fr_1fr]">
+            <div class="relative max-w-7xl mx-auto px-4 py-12">
+                <div class="grid gap-10 lg:grid-cols-[1.35fr_1fr_1fr_1fr]">
                     <div>
                         <div class="flex items-center gap-3">
                             <img src="{{ asset('menyanbo_logo.png') }}" alt="मेन्याङ्बो लोगो"
-                                class="h-14 w-14 rounded-full bg-white object-contain p-1.5 shadow-lg ring-1 ring-white/20">
+                                class="h-14 w-14 rounded-full bg-white object-contain p-1.5 shadow-lg ring-2 ring-blue-400/30">
                             <div>
                                 <h3 class="text-lg font-extrabold text-white leading-tight">मेन्याङ्बो कल्याणकारी संघ</h3>
-                                <p class="text-sm text-blue-200 mt-0.5">वंशावली तथा सदस्य अभिलेख प्रणाली</p>
+                                <p class="text-sm text-blue-100 mt-0.5">वंशावली तथा सदस्य अभिलेख प्रणाली</p>
                             </div>
                         </div>
-                        <p class="mt-4 max-w-md text-sm leading-7 text-slate-400">
+                        <p class="mt-4 max-w-md text-sm leading-7 text-blue-100/75">
                             लिम्बुवानको ऐतिहासिक मेन्याङ्बो वंशलाई डिजिटल रूपमा सुरक्षित राख्ने, सदस्य विवरण व्यवस्थापन गर्ने
                             र संघका सूचना, ग्यालेरी तथा पात्रो एउटै ठाउँमा उपलब्ध गराउने आधिकारिक पोर्टल।
                         </p>
                     </div>
 
                     <div>
-                        <h4 class="text-xs font-bold uppercase tracking-[0.18em] text-blue-300 mb-4">मुख्य लिंकहरू</h4>
-                        <nav class="grid gap-2 text-sm">
-                            <a href="{{ route('home') }}" class="footer-link">गृहपृष्ठ</a>
-                            <a href="{{ route('committee.index') }}" class="footer-link">कार्यसमिति</a>
-                            <a href="{{ route('tree.index') }}" class="footer-link">वंशावली Tree</a>
-                            <a href="{{ route('admin.people.directory') }}" class="footer-link">पारिवारिक सूची</a>
+                        <h4 class="text-xs font-bold uppercase tracking-[0.18em] text-blue-200 mb-4">मुख्य लिंकहरू</h4>
+                        <nav class="grid gap-3 text-sm">
+                            <a href="{{ route('home') }}" class="footer-link text-blue-50 hover:text-white">गृहपृष्ठ</a>
+                            <a href="{{ route('committee.index') }}" class="footer-link text-blue-50 hover:text-white">कार्यसमिति</a>
+                            <a href="{{ route('tree.index') }}" class="footer-link text-blue-50 hover:text-white">वंशावली Tree</a>
+                            <a href="{{ route('admin.people.directory') }}" class="footer-link text-blue-50 hover:text-white">पारिवारिक सूची</a>
                         </nav>
                     </div>
 
                     <div>
-                        <h4 class="text-xs font-bold uppercase tracking-[0.18em] text-blue-300 mb-4">सुविधाहरू</h4>
-                        <nav class="grid gap-2 text-sm">
-                            <a href="{{ route('notices.public') }}" class="footer-link">सूचना</a>
-                            <a href="{{ route('gallery.index') }}" class="footer-link">फोटो ग्यालेरी</a>
-                            <a href="{{ route('calendar.index') }}" class="footer-link">पात्रो</a>
-                            <a href="{{ route('feedback.create') }}" class="footer-link">सुझाव पठाउनुहोस्</a>
+                        <h4 class="text-xs font-bold uppercase tracking-[0.18em] text-blue-200 mb-4">सुविधाहरू</h4>
+                        <nav class="grid gap-3 text-sm">
+                            <a href="{{ route('notices.public') }}" class="footer-link text-blue-50 hover:text-white">सूचना</a>
+                            <a href="{{ route('gallery.index') }}" class="footer-link text-blue-50 hover:text-white">फोटो ग्यालेरी</a>
+                            <a href="{{ route('calendar.index') }}" class="footer-link text-blue-50 hover:text-white">पात्रो</a>
+                            <a href="{{ route('feedback.create') }}" class="footer-link text-blue-50 hover:text-white">सुझाव पठाउनुहोस्</a>
                         </nav>
                     </div>
 
                     <div>
-                        <h4 class="text-xs font-bold uppercase tracking-[0.18em] text-blue-300 mb-4">सम्पर्क</h4>
-                        <div class="space-y-3 text-sm text-slate-400">
+                        <h4 class="text-xs font-bold uppercase tracking-[0.18em] text-blue-200 mb-4">सम्पर्क</h4>
+                        <div class="space-y-3 text-sm text-blue-100">
                             <div class="flex gap-3">
-                                <span class="mt-0.5 inline-flex h-7 w-7 items-center justify-center rounded-lg bg-white/5 text-blue-300">
+                                <span class="mt-0.5 inline-flex h-7 w-7 items-center justify-center rounded-lg bg-blue-700/50 text-blue-200">
                                     <i class="fa-solid fa-location-dot text-xs"></i>
                                 </span>
                                 <span>धरान–१५, सुनसरी, नेपाल</span>
                             </div>
                             <a href="{{ route('feedback.create') }}"
-                                class="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-950/30 transition hover:bg-blue-500">
+                                class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-900/50 transition hover:bg-blue-500 hover:shadow-lg">
                                 <i class="fa-solid fa-paper-plane text-xs"></i>
                                 सुझाव / सम्पर्क
                             </a>
@@ -437,19 +437,19 @@
                     </div>
                 </div>
 
-                <div class="mt-9 border-t border-white/10 pt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <p class="text-xs text-slate-500">
+                <div class="mt-10 border-t border-blue-700/40 pt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <p class="text-xs text-blue-200/70">
                         © {{ date('Y') }} मेन्याङ्बो कल्याणकारी संघ। All rights reserved.
                     </p>
-                    <p class="text-xs text-slate-500">
+                    <p class="text-xs text-blue-200/70">
                         Created by
                         <a href="https://broadtechinfosys.com.np" target="_blank" rel="noopener"
-                            class="font-bold text-white hover:text-blue-300 transition">
+                            class="font-semibold text-blue-100 hover:text-white transition">
                             Broad Tech Infosys
                         </a>
-                        <span class="text-slate-600">•</span>
+                        <span class="text-blue-700">•</span>
                         <a href="https://broadtechinfosys.com.np" target="_blank" rel="noopener"
-                            class="text-blue-300 hover:text-white transition">broadtechinfosys.com.np</a>
+                            class="text-blue-200 hover:text-white transition">broadtechinfosys.com.np</a>
                     </p>
                 </div>
             </div>
