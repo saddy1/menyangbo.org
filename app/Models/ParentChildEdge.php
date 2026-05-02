@@ -10,4 +10,9 @@ class ParentChildEdge extends Model
 
     public function parent() { return $this->belongsTo(Person::class, 'parent_id'); }
     public function child() { return $this->belongsTo(Person::class, 'child_id'); }
+    protected static function booted()
+{
+    static::saved(fn () => \App\Http\Controllers\Admin\PeopleTableController::forgetCache());
+    static::deleted(fn () => \App\Http\Controllers\Admin\PeopleTableController::forgetCache());
+}
 }

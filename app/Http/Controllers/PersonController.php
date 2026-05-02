@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Person;
+use App\Support\MemberNumber;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -98,6 +99,7 @@ public function show(Person $person)
         }
 
         $person = Person::create($data);
+        MemberNumber::assignTo($person);
 
         return redirect()->route('tree.index')->with('success', 'व्यक्ति थपियो।');
     }

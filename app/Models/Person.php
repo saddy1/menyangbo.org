@@ -39,6 +39,7 @@ class Person extends Model
         'display_name',
         'gender',
         'birth_date',
+        'birth_date_bs',
         'death_date',
         'is_deceased',
         'pusta',
@@ -48,6 +49,7 @@ class Person extends Model
         'member_type',
         'membership',
         'display_name_np',
+        'display_name_limbu',
         'birth_place',
         'father_name',
         'mother_name',
@@ -199,49 +201,65 @@ class Person extends Model
      | Model events / safety rails
      * ----------------------------- */
 
-    protected static function booted(): void
-    {
-        // Keep is_deceased & dates consistent
-        static::saving(function (Person $p) {
-            // If death_date is set, always mark deceased
-            if (!is_null($p->death_date)) {
-                $p->is_deceased = true;
-            }
+   protected static function booted(): void
+{
+    // =========================
+    // Saving Logic (Your existing safety rails)
+    // =========================
+    static::saving(function (Person $p) {
 
-            // If toggled back to alive, drop death_date (so UI stays consistent)
-            if ($p->is_deceased === false) {
-                $p->death_date = null;
-            }
+        // If death_date is set, always mark deceased
+        if (!is_null($p->death_date)) {
+            $p->is_deceased = true;
+        }
 
-            // Basic date sanity: birth <= death (when both present)
-            if ($p->birth_date && $p->death_date && $p->death_date->lt($p->birth_date)) {
-                throw new \InvalidArgumentException('Death date cannot be before birth date.');
-            }
+        // If toggled back to alive, drop death_date
+        if ($p->is_deceased === false) {
+            $p->death_date = null;
+        }
 
-            // Ensure display_name is never empty
-            if (!trim((string) $p->display_name)) {
-                $parts = array_filter([$p->given_name, $p->middle_name, $p->family_name]);
-                $p->display_name = count($parts) ? implode(' ', $parts) : ($p->display_name ?: 'Unnamed');
-            }
-        });
+        // Basic date sanity
+        if ($p->birth_date && $p->death_date && $p->death_date->lt($p->birth_date)) {
+            throw new \InvalidArgumentException('Death date cannot be before birth date.');
+        }
 
-        // Soft-delete cleanup: remove edges/unions/events to avoid ghost links
-        static::deleting(function (Person $p) {
-            if ($p->isForceDeleting()) {
-                // hard delete
-                $p->childEdges()->delete();
-                $p->parentEdges()->delete();
-                $p->unionsAsSpouse1()->delete();
-                $p->unionsAsSpouse2()->delete();
-                $p->events()->delete();
-            } else {
-                // soft delete person, but hard-delete edges/unions so the graph stays valid
-                $p->childEdges()->delete();
-                $p->parentEdges()->delete();
-                $p->unionsAsSpouse1()->delete();
-                $p->unionsAsSpouse2()->delete();
-                $p->events()->delete();
-            }
-        });
-    }
+        // Ensure display_name is never empty
+        if (!trim((string) $p->display_name)) {
+            $parts = array_filter([$p->given_name, $p->middle_name, $p->family_name]);
+            $p->display_name = count($parts) ? implode(' ', $parts) : 'Unnamed';
+        }
+    });
+
+    // =========================
+    // Delete cleanup (your logic)
+    // =========================
+    static::deleting(function (Person $p) {
+
+        if ($p->isForceDeleting()) {
+            $p->childEdges()->delete();
+            $p->parentEdges()->delete();
+            $p->unionsAsSpouse1()->delete();
+            $p->unionsAsSpouse2()->delete();
+            $p->events()->delete();
+        } else {
+            $p->childEdges()->delete();
+            $p->parentEdges()->delete();
+            $p->unionsAsSpouse1()->delete();
+            $p->unionsAsSpouse2()->delete();
+            $p->events()->delete();
+        }
+    });
+
+    // =========================
+    // 🔥 CACHE AUTO CLEAR (NEW)
+    // =========================
+    static::saved(fn () =>
+        \App\Http\Controllers\Admin\PeopleTableController::forgetCache()
+    );
+
+    static::deleted(fn () =>
+        \App\Http\Controllers\Admin\PeopleTableController::forgetCache()
+    );
+}
+    
 }

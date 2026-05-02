@@ -8,9 +8,9 @@
     <div class="px-5 py-4 border-b">
       <div class="text-xl font-bold">वंशावली सदस्यहरुको सूची</div>
       <div class="text-sm text-slate-500 mt-1">
-        Total: <span class="font-semibold" x-text="allRows.length"></span>
+        Total: <span class="font-semibold" x-text="total"></span>
         <span class="mx-2">•</span>
-        Showing: <span class="font-semibold" x-text="filteredRows.length"></span>
+        Showing: <span class="font-semibold" x-text="rows.length"></span>
       </div>
     </div>
 
@@ -23,7 +23,7 @@
           class="w-full border rounded-lg pl-10 pr-3 py-2"
           placeholder="Search in Gen. Code, सदस्य न., सदस्यको नाम, बुबाको नाम, सदस्यको प्रकार ..."
           x-model="q"
-          @input="apply()"
+          @input="scheduleLoad()"
         >
       </div>
 
@@ -51,7 +51,7 @@
         <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
           <template x-for="col in columns" :key="col.key">
             <label class="inline-flex items-center gap-2">
-              <input type="checkbox" class="rounded" x-model="col.visible" @change="render()">
+              <input type="checkbox" class="rounded" x-model="col.visible">
               <span x-text="col.label"></span>
             </label>
           </template>
@@ -86,13 +86,13 @@
                     class="w-full border rounded-md px-2 py-1 bg-white"
                     :placeholder="col.label"
                     x-model="filters[col.key]"
-                    @input="apply()"
+                    @input="scheduleLoad()"
                   >
                 </template>
 
                 <template x-if="col.filter === 'select_member_type'">
                   <select class="w-full border rounded-md px-2 py-1 bg-white"
-                          x-model="filters[col.key]" @change="apply()">
+                          x-model="filters[col.key]" @change="load()">
                     <option value="">All</option>
                     <template x-for="t in memberTypes" :key="'mt-'+t">
                       <option :value="t" x-text="t"></option>
@@ -102,10 +102,21 @@
 
                 <template x-if="col.filter === 'select_alive'">
                   <select class="w-full border rounded-md px-2 py-1 bg-white"
-                          x-model="filters[col.key]" @change="apply()">
+                          x-model="filters[col.key]" @change="load()">
                     <option value="">All</option>
                     <option value="alive">Alive</option>
                     <option value="deceased">Deceased</option>
+                  </select>
+                </template>
+
+                <template x-if="col.filter === 'select_gender'">
+                  <select class="w-full border rounded-md px-2 py-1 bg-white"
+                          x-model="filters[col.key]" @change="load()">
+                    <option value="">All</option>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                    <option value="other">Other</option>
+                    <option value="unknown">Unknown</option>
                   </select>
                 </template>
 
@@ -121,17 +132,17 @@
         <tbody>
           <template x-if="loading">
             <tr>
-              <td class="px-4 py-6 text-slate-500" colspan="50">Loading all people...</td>
+              <td class="px-4 py-6 text-slate-500" colspan="50">Loading members...</td>
             </tr>
           </template>
 
-          <template x-if="!loading && filteredRows.length===0">
+          <template x-if="!loading && rows.length===0">
             <tr>
               <td class="px-4 py-6 text-slate-500" colspan="50">No results</td>
             </tr>
           </template>
 
-          <template x-for="(row, idx) in pagedRows()" :key="row.id">
+          <template x-for="(row, idx) in rows" :key="row.id">
             <tr class="border-t hover:bg-slate-50">
               <template x-for="col in visibleColumns()" :key="row.id+'-'+col.key">
                 <td class="px-4 py-3 whitespace-nowrap">
@@ -151,6 +162,18 @@
 
                   <template x-if="col.key==='pusta'">
                     <span x-text="row.pusta || '—'"></span>
+                  </template>
+
+                  <template x-if="col.key==='gender'">
+                    <span
+                      class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold"
+                      :class="genderClass(row.gender)"
+                      x-text="genderLabel(row.gender)"
+                    ></span>
+                  </template>
+
+                  <template x-if="col.key==='grandfather_name'">
+                    <span x-text="row.grandfather_name || '—'"></span>
                   </template>
 
                   <template x-if="col.key==='father_name'">
@@ -200,13 +223,11 @@
     <div class="p-4 flex flex-col md:flex-row items-center gap-3 justify-between border-t bg-white">
       <div class="flex items-center gap-2 text-sm">
         <span class="text-slate-600">Rows:</span>
-        <select class="border rounded-lg px-2 py-1" x-model.number="perPage" @change="page=1; render()">
+        <select class="border rounded-lg px-2 py-1" x-model.number="perPage" @change="page=1; load()">
           <option :value="25">25</option>
           <option :value="50">50</option>
           <option :value="100">100</option>
           <option :value="200">200</option>
-          <option :value="500">500</option>
-          <option :value="999999">ALL</option>
         </select>
       </div>
 
@@ -218,12 +239,12 @@
       <div class="flex gap-2">
         <button class="border rounded-lg px-3 py-1.5 hover:bg-slate-50"
                 :disabled="page<=1"
-                @click="page=Math.max(1,page-1)">
+                @click="goPage(page-1)">
           Prev
         </button>
         <button class="border rounded-lg px-3 py-1.5 hover:bg-slate-50"
                 :disabled="page>=totalPages()"
-                @click="page=Math.min(totalPages(),page+1)">
+                @click="goPage(page+1)">
           Next
         </button>
       </div>
@@ -232,80 +253,89 @@
 
 </div>
 
-{{-- Alpine (only if not already in admin.layout) --}}
-<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-
 <script>
 function peopleDirectory() {
   return {
     loading: true,
-
-    // all loaded rows
-    allRows: [],
-    filteredRows: [],
-
-    // global search
+    rows: [],
+    total: 0,
+    lastPage: 1,
     q: '',
-
-    // column filters
     filters: {
       member_no: '',
       display_name: '',
       pusta: '',
+      gender: '',
       father_name: '',
+      grandfather_name: '',
       mother_name: '',
       member_type: '',
       spouse_name: '',
       alive_status: '',
     },
-
-    // sort
     sortKey: 'id',
     sortDir: 'desc',
-
-    // UI
     columnsOpen: false,
     page: 1,
     perPage: 50,
     memberTypes: [],
+    debounce: null,
 
-    // Column config
     columns: [
       { key:'sn',            label:'न.',           visible:true,  sortable:false, filter:null },
       { key:'member_no',     label:'सदस्य न.',     visible:true,  sortable:true,  filter:'text' },
       { key:'display_name',  label:'सदस्यको नाम',  visible:true,  sortable:true,  filter:'text' },
       { key:'pusta',         label:'पुस्ता',      visible:true,  sortable:true,  filter:'text' },
-      { key:'father_name',   label:'बुबाको नाम',   visible:true,  sortable:true,  filter:'text' },
-      { key:'mother_name',   label:'आमाको नाम',    visible:true,  sortable:true,  filter:'text' },
+      { key:'gender',        label:'लिङ्ग',       visible:true,  sortable:true,  filter:'select_gender' },
+      { key:'grandfather_name', label:'बाजेको नाम', visible:true, sortable:false, filter:'text' },
+      { key:'father_name',   label:'बुबाको नाम',   visible:true,  sortable:false, filter:'text' },
+      { key:'mother_name',   label:'आमाको नाम',    visible:true,  sortable:false, filter:'text' },
       { key:'member_type',   label:'सदस्यको प्रकार',visible:true, sortable:true,  filter:'select_member_type' },
-      { key:'spouse_name',   label:'दम्पतीको नाम', visible:true,  sortable:true,  filter:'text' },
+      { key:'spouse_name',   label:'दम्पतीको नाम', visible:true,  sortable:false, filter:'text' },
       { key:'total_children',label:'बच्चाको संख्या',visible:true, sortable:true,  filter:null },
       { key:'alive_status',  label:'जीवित स्थिति', visible:true,  sortable:false, filter:'select_alive' },
     ],
 
-    visibleColumns() {
-      return this.columns.filter(c => c.visible);
+    visibleColumns() { return this.columns.filter(c => c.visible); },
+    memberUrl(id) { return `{{ url('/member') }}/${id}`; },
+
+    async init() { await this.load(); },
+
+    scheduleLoad() {
+      clearTimeout(this.debounce);
+      this.debounce = setTimeout(() => {
+        this.page = 1;
+        this.load();
+      }, 250);
     },
 
-    memberUrl(id) {
-      return `{{ url('/member') }}/${id}`;
+    params() {
+      const params = new URLSearchParams();
+      params.set('page', this.page);
+      params.set('per_page', this.perPage);
+      params.set('sort', this.sortKey);
+      params.set('dir', this.sortDir);
+      if (this.q.trim()) params.set('q', this.q.trim());
+
+      for (const [key, value] of Object.entries(this.filters)) {
+        if (!value) continue;
+        params.set(key, value);
+      }
+      return params;
     },
 
-    async init() {
+    async load() {
       this.loading = true;
       try {
-        const res = await fetch(`{{ route('admin.people.directory.all') }}`);
+        const res = await fetch(`{{ route('admin.people.directory.all') }}?${this.params()}`, {
+          headers: { 'Accept': 'application/json' }
+        });
         const json = await res.json();
-        this.allRows = Array.isArray(json.rows) ? json.rows : [];
-
-        // build member type list
-        const set = new Set();
-        for (const r of this.allRows) {
-          if (r.member_type && String(r.member_type).trim()) set.add(String(r.member_type).trim());
-        }
-        this.memberTypes = Array.from(set).sort((a,b)=>a.localeCompare(b));
-
-        this.apply();
+        this.rows = Array.isArray(json.rows) ? json.rows : [];
+        this.total = Number(json.count || 0);
+        this.page = Number(json.page || 1);
+        this.lastPage = Number(json.last_page || 1);
+        this.memberTypes = Array.isArray(json.member_types) ? json.member_types : [];
       } finally {
         this.loading = false;
       }
@@ -317,112 +347,37 @@ function peopleDirectory() {
       this.sortKey = 'id';
       this.sortDir = 'desc';
       this.page = 1;
-      this.apply();
+      this.load();
     },
 
     toggleSort(key) {
-      if (this.sortKey === key) {
-        this.sortDir = (this.sortDir === 'asc') ? 'desc' : 'asc';
-      } else {
-        this.sortKey = key;
-        this.sortDir = 'asc';
-      }
-      this.render();
-    },
-
-    // normalize for searching (Nepali/English)
-    norm(v) {
-      return String(v ?? '')
-        .toLowerCase()
-        .replace(/\s+/g,' ')
-        .trim();
-    },
-
-    // does row match filters?
-    rowMatches(row) {
-      // global search across common columns
-      const q = this.norm(this.q);
-      if (q) {
-        const hay = this.norm([
-          row.member_no,
-          row.display_name,
-          row.pusta,
-          row.father_name,
-          row.mother_name,
-          row.member_type,
-          row.spouse_name,
-          row.id
-        ].join(' | '));
-
-        if (!hay.includes(q)) return false;
-      }
-
-      // per-column filters
-      const f = this.filters;
-
-      if (f.member_no && !this.norm(row.member_no).includes(this.norm(f.member_no))) return false;
-      if (f.display_name && !this.norm(row.display_name).includes(this.norm(f.display_name))) return false;
-      if (f.pusta && !this.norm(row.pusta).includes(this.norm(f.pusta))) return false;
-      if (f.father_name && !this.norm(row.father_name).includes(this.norm(f.father_name))) return false;
-      if (f.mother_name && !this.norm(row.mother_name).includes(this.norm(f.mother_name))) return false;
-
-      if (f.member_type && this.norm(row.member_type) !== this.norm(f.member_type)) return false;
-
-      if (f.spouse_name && !this.norm(row.spouse_name).includes(this.norm(f.spouse_name))) return false;
-
-      if (f.alive_status) {
-        if (f.alive_status === 'alive' && row.is_deceased) return false;
-        if (f.alive_status === 'deceased' && !row.is_deceased) return false;
-      }
-
-      return true;
-    },
-
-    apply() {
-      // filter
-      this.filteredRows = this.allRows.filter(r => this.rowMatches(r));
+      if (['father_name', 'grandfather_name', 'mother_name', 'spouse_name', 'alive_status'].includes(key)) return;
+      if (this.sortKey === key) this.sortDir = this.sortDir === 'asc' ? 'desc' : 'asc';
+      else { this.sortKey = key; this.sortDir = 'asc'; }
       this.page = 1;
-      this.render();
+      this.load();
     },
 
-    render() {
-      // sort
-      const key = this.sortKey;
-      const dir = this.sortDir;
+    totalPages() { return Math.max(1, this.lastPage); },
 
-      const numKeys = new Set(['id','total_children']);
-      const getVal = (r) => {
-        if (key === 'alive_status') return r.is_deceased ? 1 : 0;
-        return r[key];
-      };
-
-      this.filteredRows.sort((a,b) => {
-        let va = getVal(a);
-        let vb = getVal(b);
-
-        if (numKeys.has(key)) {
-          va = Number(va ?? 0);
-          vb = Number(vb ?? 0);
-          return dir === 'asc' ? (va - vb) : (vb - va);
-        }
-
-        va = this.norm(va);
-        vb = this.norm(vb);
-        if (va < vb) return dir === 'asc' ? -1 : 1;
-        if (va > vb) return dir === 'asc' ? 1 : -1;
-        return 0;
-      });
+    goPage(next) {
+      const target = Math.min(this.totalPages(), Math.max(1, next));
+      if (target === this.page) return;
+      this.page = target;
+      this.load();
     },
 
-    totalPages() {
-      if (this.perPage >= 999999) return 1;
-      return Math.max(1, Math.ceil(this.filteredRows.length / this.perPage));
+    genderLabel(g) {
+      return { male:'Male', female:'Female', other:'Other', unknown:'Unknown' }[g] || '—';
     },
 
-    pagedRows() {
-      if (this.perPage >= 999999) return this.filteredRows;
-      const start = (this.page - 1) * this.perPage;
-      return this.filteredRows.slice(start, start + this.perPage);
+    genderClass(g) {
+      return {
+        male: 'bg-blue-50 text-blue-700',
+        female: 'bg-pink-50 text-pink-700',
+        other: 'bg-purple-50 text-purple-700',
+        unknown: 'bg-slate-50 text-slate-600',
+      }[g] || 'bg-slate-50 text-slate-600';
     },
   }
 }

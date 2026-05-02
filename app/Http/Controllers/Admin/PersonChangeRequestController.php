@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Person;
 use App\Models\ParentChildEdge;
+use App\Support\MemberNumber;
 use Illuminate\Http\Request;
 
 class PersonChangeRequestController extends Controller
@@ -64,9 +65,10 @@ class PersonChangeRequestController extends Controller
                     'bio' => $childData['bio'] ?? null,
                     'photo_path' => $childData['photo_path'] ?? null,
                     // optional extra
-                    'member_no' => $childData['member_no'] ?? null,
+                    'member_no' => null,
                     'display_name_np' => $childData['display_name_np'] ?? null,
                 ]);
+                MemberNumber::assignTo($child);
 
                 ParentChildEdge::create([
                     'parent_id' => $person->id,

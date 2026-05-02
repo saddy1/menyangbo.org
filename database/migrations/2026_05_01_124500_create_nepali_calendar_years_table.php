@@ -1,0 +1,40 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration {
+    public function up(): void
+    {
+        Schema::create('nepali_calendar_years', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedSmallInteger('year')->unique();
+            $table->json('month_days');
+            $table->timestamps();
+        });
+
+        $defaults = [
+            2080 => [31, 32, 31, 32, 31, 30, 30, 30, 29, 30, 29, 30],
+            2081 => [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30],
+            2082 => [31, 31, 32, 32, 31, 30, 30, 30, 29, 30, 29, 31],
+            2083 => [31, 32, 31, 32, 31, 30, 30, 30, 29, 30, 29, 31],
+            2084 => [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30],
+        ];
+
+        foreach ($defaults as $year => $days) {
+            DB::table('nepali_calendar_years')->insert([
+                'year' => $year,
+                'month_days' => json_encode($days),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('nepali_calendar_years');
+    }
+};

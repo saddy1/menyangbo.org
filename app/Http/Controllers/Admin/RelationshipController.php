@@ -15,14 +15,43 @@ class RelationshipController extends Controller
     $q = trim($request->query('q', ''));
     $type = trim($request->query('type', ''));
 
-    // people list for dropdowns
-    $people = Person::orderBy('display_name')
-        ->get(['id','display_name','member_no','pusta']);
+    $edges = $this->filteredEdges($q, $type)
+        ->orderByDesc('id')
+        ->paginate(20)
+        ->withQueryString();
 
-    $edges = ParentChildEdge::query()
+    return view('admin.relationships.index', compact('edges','q','type'));
+}
+
+    public function searchJson(Request $request)
+    {
+        $q = trim($request->query('q', ''));
+        $type = trim($request->query('type', ''));
+
+        $rows = $this->filteredEdges($q, $type)
+            ->orderByDesc('id')
+            ->limit(80)
+            ->get()
+            ->map(fn ($edge) => [
+                'id' => $edge->id,
+                'relation_type' => $edge->relation_type,
+                'parent' => $this->personPayload($edge->parent),
+                'child' => $this->personPayload($edge->child),
+            ])
+            ->values();
+
+        return response()->json([
+            'count' => $rows->count(),
+            'rows' => $rows,
+        ]);
+    }
+
+    private function filteredEdges(string $q = '', string $type = '')
+    {
+        return ParentChildEdge::query()
         ->with([
-            'parent:id,display_name,display_name_np,member_no,pusta,birth_date',
-            'child:id,display_name,display_name_np,member_no,pusta,birth_date',
+            'parent:id,display_name,display_name_np,display_name_limbu,member_no,pusta,birth_date',
+            'child:id,display_name,display_name_np,display_name_limbu,member_no,pusta,birth_date',
         ])
         ->when($type !== '', fn($qq) => $qq->where('relation_type', $type))
         ->when($q !== '', function ($qq) use ($q) {
@@ -34,30 +63,54 @@ class RelationshipController extends Controller
             // allow "pusta:3"
             if (preg_match('/^pusta\s*:\s*(\d+)$/i', $term, $m)) {
                 $p = $m[1];
-                return $qq->whereHas('parent', fn($pQ) => $pQ->where('pusta', $p))
-                          ->orWhereHas('child', fn($cQ) => $cQ->where('pusta', $p));
+                return $qq->where(function ($w) use ($p) {
+                    $w->whereHas('parent', fn($pQ) => $pQ->where('pusta', $p))
+                      ->orWhereHas('child', fn($cQ) => $cQ->where('pusta', $p));
+                });
             }
 
             return $qq->where(function ($w) use ($term) {
                 $w->whereHas('parent', function ($pQ) use ($term) {
                     $pQ->where('display_name', 'like', "%{$term}%")
                        ->orWhere('display_name_np', 'like', "%{$term}%")
+                       ->orWhere('display_name_limbu', 'like', "%{$term}%")
                        ->orWhere('member_no', 'like', "%{$term}%")
                        ->orWhere('pusta', 'like', "%{$term}%");
                 })->orWhereHas('child', function ($cQ) use ($term) {
                     $cQ->where('display_name', 'like', "%{$term}%")
                        ->orWhere('display_name_np', 'like', "%{$term}%")
+                       ->orWhere('display_name_limbu', 'like', "%{$term}%")
                        ->orWhere('member_no', 'like', "%{$term}%")
                        ->orWhere('pusta', 'like', "%{$term}%");
                 });
             });
-        })
-        ->orderByDesc('id')
-        ->paginate(20)
-        ->withQueryString();
+        });
+    }
 
-    return view('admin.relationships.index', compact('people','edges','q','type'));
-}
+    private function personPayload(?Person $person): array
+    {
+        if (!$person) {
+            return [
+                'id' => null,
+                'display_name' => '—',
+                'display_name_np' => null,
+                'display_name_limbu' => null,
+                'member_no' => null,
+                'pusta' => null,
+                'birth_year' => null,
+            ];
+        }
+
+        return [
+            'id' => $person->id,
+            'display_name' => $person->display_name,
+            'display_name_np' => $person->display_name_np,
+            'display_name_limbu' => $person->display_name_limbu,
+            'member_no' => $person->member_no,
+            'pusta' => $person->pusta,
+            'birth_year' => $person->birth_date?->format('Y'),
+        ];
+    }
 
 
     public function store(Request $request)

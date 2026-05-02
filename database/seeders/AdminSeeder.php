@@ -2,28 +2,34 @@
 
 namespace Database\Seeders;
 
+use App\Models\User;
 use Illuminate\Database\Seeder;
-use App\Models\Admin;
+use Illuminate\Support\Facades\Hash;
 
 class AdminSeeder extends Seeder
 {
     public function run(): void
     {
-        Admin::updateOrCreate(
-            ['email' => 'sadanand@ioepc.edu.np'], // unique field
+        // Super Admin
+        User::updateOrCreate(
+            ['email' => 'sadanand@ioepc.edu.np'],
             [
-                'name' => 'Sadanand Paneru',
-                'password' => bcrypt('S@ddy9843'),
-                'contact' => '9843521965',
+                'name'              => 'Sadanand Paneru',
+                'password'          => Hash::make('S@ddy9843'),
+                'role'              => User::ROLE_SUPER_ADMIN,
+                'email_verified_at' => now(),
             ]
         );
-        Admin::updateOrCreate(
-        ['email' => 'admin@menyanbo.org'], // unique field
-        [
-            'name' => 'Menyanbo Admin',
-            'password' => bcrypt('Admin@menyanbo123'),
-            'contact' => '9843521965',
-        ]
-    );
+
+        // Admin
+        User::updateOrCreate(
+            ['email' => 'admin@menyanbo.org'],
+            [
+                'name'              => 'Menyanbo Admin',
+                'password'          => Hash::make('Admin@menyanbo123'),
+                'role'              => User::ROLE_ADMIN,
+                'email_verified_at' => now(),
+            ]
+        );
     }
 }

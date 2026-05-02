@@ -27,9 +27,14 @@
         </thead>
         <tbody>
           @foreach($rows as $f)
-          <tr class="border-t hover:bg-slate-50 transition-colors">
+          <tr class="border-t hover:bg-slate-50 transition-colors {{ !$f->read_at ? 'bg-blue-50/50' : '' }}">
             <td class="p-3 hidden md:table-cell">{{ $f->id }}</td>
-            <td class="p-3 font-medium text-slate-800">{{ $f->name ?: '—' }}</td>
+            <td class="p-3 font-medium text-slate-800">
+              {{ $f->name ?: '—' }}
+              @if(!$f->read_at)
+                <span class="ml-1 rounded-full bg-blue-600 px-1.5 py-0.5 text-[10px] font-bold text-white">NEW</span>
+              @endif
+            </td>
             <td class="p-3 hidden md:table-cell">
               @if($f->email)
                 <a href="mailto:{{ $f->email }}" class="text-blue-600 hover:underline">{{ $f->email }}</a>

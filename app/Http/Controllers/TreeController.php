@@ -13,44 +13,62 @@ class TreeController extends Controller
 public function memberPage(Person $person)
 {
     $person->load([
-        'parents:id,display_name,gender,pusta',
-        'children:id,display_name,gender,pusta',
-        'unionsAsSpouse1.spouse2:id,display_name,gender',
-        'unionsAsSpouse2.spouse1:id,display_name,gender',
+        'parents:id,display_name,gender,pusta,birth_date,death_date,is_deceased,photo_path,member_no',
+        'children:id,display_name,gender,pusta,birth_date,is_deceased,member_no',
+        'unionsAsSpouse1.spouse2:id,display_name,gender,birth_date,is_deceased,photo_path',
+        'unionsAsSpouse2.spouse1:id,display_name,gender,birth_date,is_deceased,photo_path',
         'events',
     ]);
 
-    // 🔹 Get Father & Mother from parents relation
-    $father = $person->parents
-        ->firstWhere('gender', 'male');
+    $father = $person->parents->firstWhere('gender', 'male');
+    $mother = $person->parents->firstWhere('gender', 'female');
 
-    $mother = $person->parents
-        ->firstWhere('gender', 'female');
+    // Load grandfather & grandmother (father's parents)
+    $grandfather = null;
+    $grandmother = null;
+    if ($father) {
+        $father->load(['parents:id,display_name,gender,birth_date,death_date,is_deceased,photo_path']);
+        $grandfather = $father->parents->firstWhere('gender', 'male');
+        $grandmother = $father->parents->firstWhere('gender', 'female');
+    }
 
-    // 🔹 Get spouses from unions
+    // Spouses
     $spouses = collect();
-
     foreach ($person->unionsAsSpouse1 as $u) {
-        if ($u->spouse2) {
-            $spouses->push($u->spouse2);
-        }
+        if ($u->spouse2) $spouses->push($u->spouse2);
     }
-
     foreach ($person->unionsAsSpouse2 as $u) {
-        if ($u->spouse1) {
-            $spouses->push($u->spouse1);
-        }
+        if ($u->spouse1) $spouses->push($u->spouse1);
     }
-
     $spouses = $spouses->unique('id')->values();
+    $spouses->each(fn ($spouse) => $spouse->loadMissing([
+        'children:id,display_name,gender,pusta,birth_date,is_deceased',
+    ]));
+    $children = $this->sharedChildrenFor($person, $spouses);
 
     return view('tree.member', [
-        'person'   => $person,
-        'father'   => $father,
-        'mother'   => $mother,
-        'spouses'  => $spouses,
+        'person'      => $person,
+        'father'      => $father,
+        'mother'      => $mother,
+        'grandfather' => $grandfather,
+        'grandmother' => $grandmother,
+        'spouses'     => $spouses,
+        'children'    => $children,
     ]);
 }
+
+    private function tinyPerson(Person $person): array
+    {
+        return [
+            'id' => (string) $person->id,
+            'display_name' => $person->display_name,
+            'display_name_np' => $person->display_name_np,
+            'display_name_limbu' => $person->display_name_limbu,
+            'gender' => $person->gender ?: 'unknown',
+            'pusta' => $person->pusta,
+            'photo_path' => $person->photo_path,
+        ];
+    }
 
     public function committee()
     {
@@ -85,7 +103,9 @@ public function memberPage(Person $person)
         $hasEn1 = Schema::hasColumn('people', 'display_name_en');
         $hasEn2 = Schema::hasColumn('people', 'name_en');
 
-        $q = Person::query()->select('id', 'display_name', 'gender', 'pusta');
+        $q = Person::query()
+            ->with(['parents:id,display_name,gender'])
+            ->select('id', 'display_name', 'display_name_np', 'display_name_limbu', 'member_no', 'membership', 'gender', 'pusta');
         if ($hasEn1) $q->addSelect('display_name_en');
         if ($hasEn2) $q->addSelect('name_en');
 
@@ -95,6 +115,10 @@ public function memberPage(Person $person)
             $q->where(function ($w) use ($term, $hasEn1, $hasEn2) {
                 if (ctype_digit($term)) $w->orWhere('id', (int)$term);
                 $w->orWhere('display_name', 'like', "%{$term}%");
+                $w->orWhere('display_name_np', 'like', "%{$term}%");
+                $w->orWhere('display_name_limbu', 'like', "%{$term}%");
+                $w->orWhere('member_no', 'like', "%{$term}%");
+                $w->orWhere('membership', 'like', "%{$term}%");
                 if ($hasEn1) $w->orWhere('display_name_en', 'like', "%{$term}%");
                 if ($hasEn2) $w->orWhere('name_en', 'like', "%{$term}%");
             });
@@ -110,7 +134,12 @@ public function memberPage(Person $person)
             return [
                 'id' => (string)$r->id,
                 'display_name' => $r->display_name,
+                'display_name_np' => $r->display_name_np,
+                'display_name_limbu' => $r->display_name_limbu,
                 'name_en' => $en,
+                'member_no' => $r->member_no,
+                'member_number' => $r->member_no ?: $r->membership,
+                'father_name' => optional($r->parents->firstWhere('gender', 'male'))->display_name,
                 'gender' => $r->gender ?: 'unknown',
                 'pusta'  => $r->pusta,
             ];
@@ -138,13 +167,33 @@ public function memberPage(Person $person)
     public function personShow(Person $person)
     {
         $person->load([
-            'parents:id,display_name,gender,pusta',
-            'children:id,display_name,gender,pusta',
+            'parents:id,display_name,display_name_np,display_name_limbu,gender,pusta,photo_path',
+            'parents.parents:id,display_name,display_name_np,display_name_limbu,gender,pusta,photo_path',
+            'children:id,display_name,display_name_np,display_name_limbu,gender,pusta,photo_path',
+            'unionsAsSpouse1.spouse2:id,display_name,display_name_np,display_name_limbu,gender,pusta,photo_path',
+            'unionsAsSpouse2.spouse1:id,display_name,display_name_np,display_name_limbu,gender,pusta,photo_path',
         ]);
+
+        $father = $person->parents->firstWhere('gender', 'male');
+        $mother = $person->parents->firstWhere('gender', 'female');
+        $grandfather = $father?->parents?->firstWhere('gender', 'male');
+
+        $spouses = $person->unionsAsSpouse1
+            ->map(fn($u) => $u->spouse2)
+            ->merge($person->unionsAsSpouse2->map(fn($u) => $u->spouse1))
+            ->filter()
+            ->unique('id')
+            ->values();
+        $spouses->each(fn ($spouse) => $spouse->loadMissing([
+            'children:id,display_name,display_name_np,display_name_limbu,gender,pusta,photo_path',
+        ]));
+        $children = $this->sharedChildrenFor($person, $spouses);
 
         return response()->json([
             'id' => (string)$person->id,
             'display_name' => $person->display_name,
+            'display_name_np' => $person->display_name_np,
+            'display_name_limbu' => $person->display_name_limbu,
             'gender' => $person->gender ?: 'unknown',
             'pusta' => $person->pusta,
             'bio' => $person->bio ?? null,
@@ -152,19 +201,26 @@ public function memberPage(Person $person)
             'is_deceased' => (bool)($person->is_deceased ?? false),
             'birth_date' => $person->birth_date ? $person->birth_date->format('Y-m-d') : null,
             'death_date' => $person->death_date ? $person->death_date->format('Y-m-d') : null,
-            'parents' => ($person->parents ?? collect())->map(fn($p) => [
-                'id' => (string)$p->id,
-                'display_name' => $p->display_name,
-                'gender' => $p->gender,
-                'pusta' => $p->pusta
-            ])->values(),
-            'children' => ($person->children ?? collect())->map(fn($c) => [
-                'id' => (string)$c->id,
-                'display_name' => $c->display_name,
-                'gender' => $c->gender,
-                'pusta' => $c->pusta
-            ])->values(),
+            'father' => $father ? $this->tinyPerson($father) : null,
+            'mother' => $mother ? $this->tinyPerson($mother) : null,
+            'grandfather' => $grandfather ? $this->tinyPerson($grandfather) : null,
+            'parents' => ($person->parents ?? collect())->map(fn($p) => $this->tinyPerson($p))->values(),
+            'spouses' => $spouses->map(fn($s) => $this->tinyPerson($s))->values(),
+            'children' => $children->map(fn($c) => $this->tinyPerson($c))->values(),
         ]);
+    }
+
+    private function sharedChildrenFor(Person $person, $spouses)
+    {
+        return collect($person->children ?? [])
+            ->merge(collect($spouses)->flatMap(fn ($spouse) => $spouse->children ?? collect()))
+            ->filter()
+            ->unique('id')
+            ->sortBy([
+                fn ($a, $b) => ($a->birth_date?->timestamp ?? PHP_INT_MAX) <=> ($b->birth_date?->timestamp ?? PHP_INT_MAX),
+                fn ($a, $b) => $a->id <=> $b->id,
+            ])
+            ->values();
     }
 
     /** Tree JSON (spouse embedded in person node; NO union nodes) */
@@ -172,6 +228,9 @@ public function memberPage(Person $person)
     {
         $rootId = (int)($request->query('root_id') ?: 0);
         $depth  = (int)($request->query('depth') ?: 5);
+        if (!in_array($depth, [2,5,10,15,20,30], true)) {
+            $depth = 5;
+        }
 
         if (!$rootId) {
             $rootId = (int)(Person::query()->orderBy('id')->value('id') ?? 0);
@@ -180,7 +239,7 @@ public function memberPage(Person $person)
 
         // Load all people minimal fields
         $people = Person::query()
-            ->select('id','display_name','gender','pusta','birth_date','is_deceased')
+            ->select('id','display_name','display_name_np','display_name_limbu','gender','pusta','birth_date','is_deceased','photo_path')
             ->get()
             ->keyBy('id');
 
@@ -240,40 +299,53 @@ public function memberPage(Person $person)
                 'id' => (string)$p->id,
                 'type' => 'person',
                 'name' => $p->display_name,
+                'name_np' => $p->display_name_np,
+                'name_limbu' => $p->display_name_limbu,
                 'gender' => $p->gender ?: 'unknown',
                 'pusta' => $p->pusta,
+                'photo_path' => $p->photo_path,
                 'is_deceased' => (bool)($p->is_deceased ?? false),
                 'children' => [],
             ];
 
-            if ($level >= $depth) return $node;
+            // The selected depth means visible generations including the root.
+            // Example: depth=2 => root + children only.
+            if ($level >= $depth - 1) return $node;
 
-            // ✅ spouse embedded (first union only)
-            $spouse = null;
-            $unionKids = [];
+            // All spouses embedded
+            $spousesArr    = [];
+            $unionKids     = [];
+            $addedUnionKids = [];
 
-            $u = ($unionsByPerson[$pid] ?? [])[0] ?? null;
-            if ($u) {
+            foreach (($unionsByPerson[$pid] ?? []) as $u) {
                 $spouseId = ((int)$u->spouse1_id === $pid) ? (int)$u->spouse2_id : (int)$u->spouse1_id;
 
                 if (isset($people[$spouseId])) {
                     $sp = $people[$spouseId];
 
-                    $spouse = [
-                        'id' => (string)$sp->id,
-                        'name' => $sp->display_name,
-                        'gender' => $sp->gender ?: 'unknown',
-                        'pusta' => $sp->pusta,
+                    $spousesArr[] = [
+                        'id'       => (string)$sp->id,
+                        'name'     => $sp->display_name,
+                        'name_np'  => $sp->display_name_np,
+                        'name_limbu' => $sp->display_name_limbu,
+                        'gender'   => $sp->gender ?: 'unknown',
+                        'pusta'    => $sp->pusta,
+                        'photo_path' => $sp->photo_path,
                         'is_deceased' => (bool)($sp->is_deceased ?? false),
                     ];
 
-                    // common children of couple
-                    $unionKids = $commonChildren($pid, $spouseId);
+                    foreach ($commonChildren($pid, $spouseId) as $cid) {
+                        if (!isset($addedUnionKids[$cid])) {
+                            $addedUnionKids[$cid] = true;
+                            $unionKids[] = $cid;
+                        }
+                    }
                 }
             }
 
-            if ($spouse) {
-                $node['spouse'] = $spouse;
+            if (!empty($spousesArr)) {
+                $node['spouses'] = $spousesArr;
+                $node['spouse']  = $spousesArr[0]; // backward compat
             }
 
             // ✅ children: couple kids first, then remaining

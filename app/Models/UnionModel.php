@@ -19,4 +19,10 @@ class UnionModel extends Model
 
     public function spouse1() { return $this->belongsTo(Person::class, 'spouse1_id'); }
     public function spouse2() { return $this->belongsTo(Person::class, 'spouse2_id'); }
+
+    protected static function booted()
+{
+    static::saved(fn () => \App\Http\Controllers\Admin\PeopleTableController::forgetCache());
+    static::deleted(fn () => \App\Http\Controllers\Admin\PeopleTableController::forgetCache());
+}
 }

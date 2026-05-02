@@ -42,6 +42,10 @@ class FeedbackController extends Controller
     }
 
     public function adminShow(Feedback $feedback) {
+        if (!$feedback->read_at) {
+            $feedback->update(['read_at' => now()]);
+        }
+
         return view('admin.feedback.show', compact('feedback'));
     }
 
