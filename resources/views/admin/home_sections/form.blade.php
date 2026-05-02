@@ -2,6 +2,7 @@
 @section('title', $item ? 'Edit Item' : 'Add Item')
 
 @section('content')
+@php $isBanner = old('section', $section) === 'banner'; @endphp
 <div class="py-6 max-w-2xl mx-auto">
 
   <div class="flex items-center gap-3 mb-6">
@@ -48,7 +49,7 @@
       </div>
 
       {{-- Subtitle --}}
-      <div class="mb-4">
+      <div class="mb-4 {{ $isBanner ? 'hidden' : '' }}">
         <label class="block text-sm font-semibold text-gray-700 mb-1">
           Subtitle / Badge
           <span class="text-xs font-normal text-gray-400 ml-1">(role, date badge, or key label)</span>
@@ -60,7 +61,7 @@
       </div>
 
       {{-- Body --}}
-      <div class="mb-4">
+      <div class="mb-4 {{ $isBanner ? 'hidden' : '' }}">
         <label class="block text-sm font-semibold text-gray-700 mb-1">
           Body / Description
           <span class="text-xs font-normal text-gray-400 ml-1">(for bullet points, put each point on a new line)</span>

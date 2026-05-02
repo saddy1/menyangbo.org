@@ -25,7 +25,7 @@
       'notes'       => 'fa-note-sticky',
     ];
     $sectionHelp = [
-      'banner'      => 'home page promotional banner. title = headline, subtitle = small label, body = short text, image/link optional.',
+      'banner'      => 'home page banner. Only title is displayed on banner. Image/link optional.',
       'at_a_glance' => 'title = label, body = value. These show as key-value cards.',
       'timeline'    => 'title = event heading, subtitle = date/badge, body = bullet points (one per line).',
       'key_figures' => 'title = person name, subtitle = role/tag, body = description, color = card accent.',

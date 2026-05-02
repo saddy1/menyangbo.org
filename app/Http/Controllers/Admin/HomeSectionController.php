@@ -38,6 +38,10 @@ class HomeSectionController extends Controller
             'is_active'  => ['nullable', 'boolean'],
         ]);
         unset($data['image']);
+        if (($data['section'] ?? null) === 'banner') {
+            $data['subtitle'] = null;
+            $data['body'] = null;
+        }
         $data['sort_order'] = $data['sort_order'] ?? 0;
         $data['is_active']  = $request->boolean('is_active', true);
         $data['image_path'] = $this->storeImage($request);
@@ -67,6 +71,10 @@ class HomeSectionController extends Controller
             'is_active'    => ['nullable', 'boolean'],
         ]);
         unset($data['image'], $data['remove_image']);
+        if (($data['section'] ?? null) === 'banner') {
+            $data['subtitle'] = null;
+            $data['body'] = null;
+        }
         $data['sort_order'] = $data['sort_order'] ?? 0;
         $data['is_active']  = $request->boolean('is_active');
 

@@ -86,23 +86,23 @@ $colorMap = [
                          style="background-image: radial-gradient(circle at 20% 30%, white 0 2px, transparent 3px), radial-gradient(circle at 70% 70%, white 0 2px, transparent 3px); background-size: 44px 44px;"></div>
                 @endif
 
-                @if($banner->subtitle || $bannerUrl)
-                    <div class="absolute right-3 top-3 flex max-w-[calc(100%-1.5rem)] items-center gap-2 rounded-full bg-white/90 px-2.5 py-2 text-xs shadow-lg ring-1 ring-black/5 backdrop-blur sm:right-4 sm:top-4">
-                        @if($banner->subtitle)
-                            <span class="truncate font-bold text-slate-700">{{ $banner->subtitle }}</span>
-                        @endif
+                <div class="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/75 via-black/35 to-transparent px-4 pb-5 pt-16 sm:px-6 sm:pb-6">
+                    <div class="flex flex-wrap items-end justify-between gap-3">
+                        <h2 class="max-w-3xl text-2xl font-black leading-tight text-white drop-shadow sm:text-4xl">
+                            {{ $banner->title }}
+                        </h2>
                         @if($bannerUrl)
-                            <a href="{{ $bannerUrl }}"
-                               @if($isExternal) target="_blank" rel="noopener" @endif
-                               class="inline-flex shrink-0 items-center gap-1 rounded-full bg-slate-900 px-3 py-1.5 font-bold text-white transition hover:bg-slate-800">
-                                {{ $banner->link_label ?: 'Open' }}
-                                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
-                                </svg>
-                            </a>
+                        <a href="{{ $bannerUrl }}"
+                           @if($isExternal) target="_blank" rel="noopener" @endif
+                           class="inline-flex shrink-0 items-center gap-1 rounded-full bg-white px-4 py-2 text-xs font-black text-slate-900 shadow-lg transition hover:bg-blue-50">
+                            {{ $banner->link_label ?: 'Open' }}
+                            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
+                            </svg>
+                        </a>
                         @endif
                     </div>
-                @endif
+                </div>
             </div>
         @endforeach
 
