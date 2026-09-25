@@ -7,6 +7,7 @@ use App\Models\ParentChildEdge;
 use App\Models\PersonChangeRequest;
 use App\Models\UnionModel;
 use App\Support\MemberNumber;
+use App\Support\SiblingOrder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -29,7 +30,7 @@ class UserPersonChangeRequestController extends Controller
         }
 
         $request->validate([
-            'photo' => ['required', 'image', 'mimes:jpeg,jpg,png,webp', 'max:200'],
+            'photo' => ['required', 'image', 'mimes:jpeg,jpg,png,webp', 'max:500'],
         ]);
 
         $file     = $request->file('photo');
@@ -132,9 +133,15 @@ class UserPersonChangeRequestController extends Controller
             'religion'        => ['nullable', 'string', 'max:100'],
             'special_note'    => ['nullable', 'string', 'max:2000'],
             'bio'             => ['nullable', 'string', 'max:5000'],
-            'photo'           => ['nullable', 'image', 'mimes:jpeg,jpg,png,webp', 'max:200'],
+            'photo'           => ['nullable', 'image', 'mimes:jpeg,jpg,png,webp', 'max:500'],
             'submitted_name'  => ['nullable', 'string', 'max:255'],
+            'birth_order'     => ['nullable', 'integer', 'min:1', 'max:30'],
         ]);
+        if (!empty($validated['birth_order']) && isset(SiblingOrder::taken($parent, $validated['gender'])[(int) $validated['birth_order']])) {
+            return back()
+                ->withErrors(['birth_order' => 'यो सन्तान क्रम पहिले नै अर्को सन्तानको हो। अर्को छान्नुहोस्।'])
+                ->withInput()->with('open_modal', 'child');
+        }
         $validated = array_merge($validated, $this->namePartsFromDisplayName($validated['display_name']));
         if ($request->hasFile('photo')) {
             $validated['photo_path'] = $this->storeRequestPhoto($request->file('photo'), 'child');
@@ -142,7 +149,7 @@ class UserPersonChangeRequestController extends Controller
 
         // ── Admin: create person + edge directly ───────────────────────────────
         if (Auth::user()->isAdmin()) {
-            $childData = collect($validated)->except(['submitted_name', 'photo'])->filter()->toArray();
+            $childData = collect($validated)->except(['submitted_name', 'photo', 'birth_order'])->filter()->toArray();
             if (empty($childData['pusta'])) {
                 $parentPusta = $this->pustaToInt($parent->pusta);
                 if ($parentPusta) $childData['pusta'] = (string)($parentPusta + 1);
@@ -154,6 +161,9 @@ class UserPersonChangeRequestController extends Controller
                 'parent_id' => $parent->id,
                 'child_id'  => $child->id,
             ]);
+            if (!empty($validated['birth_order'])) {
+                SiblingOrder::assign($parent, $child, (int) $validated['birth_order']);
+            }
             return redirect()->route('member.page', $parent->id)
                 ->with('success_message', $child->display_name . ' सन्तानको रूपमा सिधै थपियो।');
         }
@@ -205,7 +215,7 @@ class UserPersonChangeRequestController extends Controller
             'religion'        => ['nullable', 'string', 'max:100'],
             'special_note'    => ['nullable', 'string', 'max:2000'],
             'bio'             => ['nullable', 'string', 'max:5000'],
-            'photo'           => ['nullable', 'image', 'mimes:jpeg,jpg,png,webp', 'max:200'],
+            'photo'           => ['nullable', 'image', 'mimes:jpeg,jpg,png,webp', 'max:500'],
             'submitted_name'  => ['nullable', 'string', 'max:255'],
             'submitted_note'  => ['nullable', 'string', 'max:1000'],
         ]);

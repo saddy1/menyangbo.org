@@ -40,6 +40,7 @@ class Person extends Model
         'gender',
         'birth_date',
         'birth_date_bs',
+        'birth_order',
         'death_date',
         'is_deceased',
         'pusta',

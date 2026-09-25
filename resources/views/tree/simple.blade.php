@@ -20,8 +20,77 @@
 
         .link {
             fill: none;
-            stroke: #cbd5e1;
-            stroke-width: 1;
+            stroke-width: 1.3;
+        }
+
+        .tree-canvas {
+            background-color: #f8fafc;
+            background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
+            background-size: 22px 22px;
+        }
+        .tree-legend {
+            position: absolute;
+            left: 12px;
+            bottom: 12px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            padding: 7px 12px;
+            background: rgba(255,255,255,.92);
+            border: 1px solid #e2e8f0;
+            border-radius: 999px;
+            box-shadow: 0 4px 14px rgba(15,23,42,.06);
+            font-size: 11px;
+            font-weight: 600;
+            color: #334155;
+            backdrop-filter: blur(4px);
+        }
+        .tree-legend span { display: inline-flex; align-items: center; gap: 5px; }
+        .tree-legend i { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+        @media (max-width: 640px) {
+            .tree-legend { border-radius: 12px; right: 12px; gap: 6px 10px; font-size: 10px; }
+        }
+
+        .hover-card .pc-member {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            border-radius: 999px;
+            padding: 1px 7px;
+            background: #eef2ff;
+            color: #3730a3;
+            font-size: 10px;
+            font-weight: 800;
+        }
+        .hover-card .pc-cols {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+        }
+        .hover-card .pc-col-title {
+            font-size: 10px;
+            font-weight: 800;
+            padding: 2px 5px;
+            border-radius: 5px;
+            margin-bottom: 2px;
+        }
+        .hover-card .pc-num {
+            flex: 0 0 16px;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 9px;
+            font-weight: 800;
+            color: #fff;
+        }
+        .hover-card .pc-sub {
+            display: block;
+            font-size: 9px;
+            font-weight: 700;
+            color: #94a3b8;
         }
 
         /* Popup card — fixed in screen coords, compact & clearly bordered */
@@ -221,6 +290,14 @@
                 <span x-text="'Level ' + levelText"></span>
             </div>
 
+            <button type="button" @click="toggleUnconnected()"
+                class="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm font-semibold text-amber-800 hover:bg-amber-100"
+                title="रुखमा नजोडिएका सदस्यहरू">
+                नजोडिएका सदस्य
+                <span class="rounded-full bg-amber-500 px-2 py-0.5 text-[11px] font-bold text-white"
+                    x-text="unconnectedCount === null ? '…' : unconnectedCount"></span>
+            </button>
+
             <div class="searchBox relative w-[360px] ml-auto">
                 <input type="text" class="w-full border rounded-lg px-3 py-2 text-sm"
                     placeholder="Search Members by ID/Name..."
@@ -325,8 +402,83 @@
 
         {{-- ── SVG CANVAS ── --}}
         <div class="relative w-full" style="height: calc(100vh - 64px);">
-            <svg x-ref="svg" class="absolute inset-0 w-full h-full bg-white"></svg>
+            <svg x-ref="svg" class="tree-canvas absolute inset-0 w-full h-full"></svg>
+
+            <div class="tree-legend">
+                <span><i :style="`background:${COLORS.male}`"></i>छोरा / पुरुष</span>
+                <span><i :style="`background:${COLORS.female}`"></i>छोरी</span>
+                <span><i :style="`background:${COLORS.buhari}`"></i>बुहारी</span>
+                <span><i :style="`background:${COLORS.unknown}`"></i>अज्ञात</span>
+            </div>
         </div>
+
+        {{-- ── UNCONNECTED MEMBERS DRAWER ── --}}
+        <div x-show="unconnectedOpen" x-cloak class="fixed inset-0 z-40 bg-slate-900/20" @click="unconnectedOpen=false"></div>
+        <aside x-show="unconnectedOpen" x-cloak
+            x-transition:enter="transition ease-out duration-200" x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0"
+            x-transition:leave="transition ease-in duration-150" x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full"
+            class="fixed right-0 top-0 z-50 h-full w-[380px] max-w-full bg-white shadow-2xl border-l border-slate-200 flex flex-col">
+            <div class="px-4 py-3 border-b border-slate-100 flex items-center gap-2">
+                <div class="min-w-0">
+                    <div class="font-bold text-slate-900">नजोडिएका सदस्यहरू</div>
+                    <div class="text-[11px] text-slate-500">मुख्य वंशावली रुखमा नजोडिएका नामहरू</div>
+                </div>
+                <button type="button" @click="unconnectedOpen=false"
+                    class="ml-auto w-8 h-8 rounded-full hover:bg-slate-100 text-slate-500 text-lg leading-none">×</button>
+            </div>
+
+            <div class="px-4 pt-3 flex gap-2">
+                <button type="button" @click="unconnectedTab='roots'"
+                    class="flex-1 rounded-lg px-3 py-2 text-xs font-bold border"
+                    :class="unconnectedTab==='roots' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'">
+                    छुट्टै परिवार (<span x-text="unconnected.roots.length"></span>)
+                </button>
+                <button type="button" @click="unconnectedTab='isolated'"
+                    class="flex-1 rounded-lg px-3 py-2 text-xs font-bold border"
+                    :class="unconnectedTab==='isolated' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'">
+                    एक्लो नाम (<span x-text="unconnected.isolated.length"></span>)
+                </button>
+            </div>
+            <p class="px-4 pt-2 text-[11px] leading-snug text-slate-500"
+                x-text="unconnectedTab==='roots'
+                    ? 'बुबा/आमा नजोडिएका तर छोराछोरी भएका — यिनको परिवार मुख्य रुखमा जोड्न बाँकी छ।'
+                    : 'न बुबा/आमा, न छोराछोरी जोडिएका — कुनै नाता नभएका नामहरू।'"></p>
+
+            <div class="px-4 pt-2">
+                <input type="text" x-model="unconnectedFilter" placeholder="नाम वा सदस्य नं. खोज्नुहोस्…"
+                    class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">
+            </div>
+
+            <div class="flex-1 overflow-y-auto px-2 py-2">
+                <template x-if="unconnectedLoading">
+                    <div class="px-3 py-6 text-center text-sm text-slate-400">Loading…</div>
+                </template>
+                <template x-for="u in filteredUnconnected()" :key="u.id">
+                    <div class="flex items-center gap-3 rounded-xl px-2 py-2 hover:bg-slate-50">
+                        <span class="flex-none w-9 h-9 rounded-full text-white text-xs font-bold flex items-center justify-center"
+                            :style="`background:${genderColor(u.gender)}`" x-text="genderLetter(u.gender)"></span>
+                        <div class="min-w-0 flex-1">
+                            <div class="font-semibold text-sm text-slate-900 truncate" x-text="u.display_name"></div>
+                            <div class="text-[11px] text-slate-500 truncate">
+                                <span x-text="u.member_no || ('#'+u.id)"></span>
+                                <span x-show="u.pusta" x-text="' · पु.'+u.pusta"></span>
+                                <span x-show="u.spouse_names.length" x-text="' · जीवनसाथी: '+u.spouse_names.join(', ')"></span>
+                            </div>
+                        </div>
+                        <div class="flex-none flex gap-1">
+                            <button type="button" @click="unconnectedOpen=false; setRootById(u.id)"
+                                class="rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-bold text-slate-700 hover:bg-white">रुख</button>
+                            <a :href="isAdmin ? editUrl(u.id) : memberUrl(u.id)"
+                                class="rounded-lg bg-slate-900 px-2 py-1 text-[11px] font-bold text-white hover:bg-slate-700"
+                                x-text="isAdmin ? 'जोड्नुहोस्' : 'विवरण'"></a>
+                        </div>
+                    </div>
+                </template>
+                <template x-if="!unconnectedLoading && filteredUnconnected().length===0">
+                    <div class="px-3 py-6 text-center text-sm text-slate-400">कुनै नाम छैन</div>
+                </template>
+            </div>
+        </aside>
 
         {{-- ── COMPACT POPUP ── --}}
         <div
@@ -346,19 +498,24 @@
 
                     {{-- Header --}}
                     <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
-                        <div style="width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#fff; font-size:11px; font-weight:800; flex-shrink:0;"
-                            :style="`background:${genderColor(hoverPerson.gender)}`">
-                            <span x-text="genderLetter(hoverPerson.gender)"></span>
+                        <div style="width:38px; height:38px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#fff; font-size:12px; font-weight:800; flex-shrink:0; overflow:hidden; box-shadow:0 0 0 2px #fff, 0 0 0 4px var(--ring);"
+                            :style="`background:${personColor(hoverPerson)}; --ring:${personColor(hoverPerson)}55`">
+                            <template x-if="hoverPerson.photo_path">
+                                <img :src="assetUrl(hoverPerson.photo_path)" alt="" style="width:100%; height:100%; object-fit:cover;">
+                            </template>
+                            <span x-show="!hoverPerson.photo_path" x-text="genderLetter(hoverPerson.gender)"></span>
                         </div>
                         <div style="min-width:0;">
-                            <div style="font-size:12px; font-weight:800; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:210px;"
+                            <div style="font-size:12.5px; font-weight:800; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:210px;"
                                 x-text="hoverPerson.display_name"></div>
                             <div style="font-size:10px; color:#64748b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:210px;"
                                  x-text="[hoverPerson.display_name_np, hoverPerson.display_name_limbu].filter(Boolean).join(' / ')"></div>
-                            <div style="font-size:9px; color:#94a3b8;">
-                                <span x-text="hoverPerson.member_no || ('#'+hoverPerson.id)"></span>
-                                <span style="margin:0 2px;">·</span>
-                                <span x-text="hoverPerson.pusta?('पु.'+hoverPerson.pusta):'—'"></span>
+                            <div style="display:flex; flex-wrap:wrap; align-items:center; gap:4px; margin-top:3px;">
+                                <span class="pc-member" title="सदस्य नम्बर">सदस्य नं. <span x-text="hoverPerson.member_no || ('#'+hoverPerson.id)"></span></span>
+                                <span class="pc-tag pc-tag-slate" x-show="hoverPerson.pusta" x-text="'पु.'+hoverPerson.pusta"></span>
+                                <span class="pc-tag" x-show="hoverPerson.is_buhari" style="background:#fef3c7; color:#b45309;">बुहारी</span>
+                                <span class="pc-tag" x-show="hoverPerson.birth && !hoverPerson.is_buhari"
+                                    :class="childTagClass(hoverPerson.gender)" x-text="hoverPerson.birth?.label"></span>
                             </div>
                         </div>
                     </div>
@@ -397,22 +554,37 @@
                             <button class="pc-row" @click="setRootById(ss.id)">
                                 <span class="pc-gender" :style="`background:${genderColor(ss.gender)}`" x-text="genderLetter(ss.gender)"></span>
                                 <span class="pc-name" x-text="ss.display_name"></span>
+                                <span class="pc-sub" style="margin-left:auto;" x-text="ss.member_no || ''"></span>
                             </button>
                         </template>
                     </div>
 
-                    {{-- Children --}}
+                    {{-- Children: sons and daughters in separate columns --}}
                     <div class="pc-section">
                         <div class="pc-label">छोराछोरी / Children</div>
                         <template x-if="(hoverPerson.children||[]).length===0">
                             <span class="pc-empty">—</span>
                         </template>
-                        <template x-for="cc in (hoverPerson.children||[])" :key="cc.id">
-                            <button class="pc-row" @click="setRootById(cc.id)">
-                                <span class="pc-gender" :style="`background:${genderColor(cc.gender)}`" x-text="genderLetter(cc.gender)"></span>
-                                <span class="pc-name" x-text="compactName(cc)"></span>
-                            </button>
-                        </template>
+                        <div class="pc-cols" x-show="(hoverPerson.children||[]).length">
+                            <template x-for="col in childColumns(hoverPerson)" :key="col.key">
+                                <div style="min-width:0;">
+                                    <div class="pc-col-title" :class="col.className" x-text="`${col.title} (${col.items.length})`"></div>
+                                    <template x-if="col.items.length===0">
+                                        <span class="pc-empty">—</span>
+                                    </template>
+                                    <template x-for="cc in col.items" :key="cc.id">
+                                        <button class="pc-row" style="align-items:flex-start;" @click="setRootById(cc.id)"
+                                            :title="[cc.birth?.label, cc.member_no].filter(Boolean).join(' · ')">
+                                            <span class="pc-num" :style="`background:${genderColor(cc.gender)}`" x-text="cc.birth ? npDigits(cc.birth.rank) : '•'"></span>
+                                            <span style="min-width:0;">
+                                                <span class="pc-name" style="display:block;" x-text="cc.display_name"></span>
+                                                <span class="pc-sub" x-text="[cc.birth?.word, cc.member_no].filter(Boolean).join(' · ')"></span>
+                                            </span>
+                                        </button>
+                                    </template>
+                                </div>
+                            </template>
+                        </div>
                     </div>
 
                 </div>
@@ -432,8 +604,23 @@
             NE2EN: { '०':'0','१':'1','२':'2','३':'3','४':'4','५':'5','६':'6','७':'7','८':'8','९':'9' },
             toENdigits(s){ return String(s||'').replace(/[०-९]/g, d => this.NE2EN[d]||d); },
 
-            genderColor(g){ return g==='male'?'#2563eb': g==='female'?'#ef4444':'#7c3aed'; },
+            COLORS: { male:'#2563eb', female:'#ec4899', buhari:'#f59e0b', unknown:'#7c3aed' },
+            genderColor(g){ return this.COLORS[g==='male'||g==='female' ? g : 'unknown']; },
+            personColor(p){ return p?.is_buhari ? this.COLORS.buhari : this.genderColor(p?.gender); },
             genderLetter(g){ return g==='male'?'M': g==='female'?'F':'?'; },
+            npDigits(n){ return String(n ?? '').replace(/[0-9]/g, d => '०१२३४५६७८९'[d]); },
+            memberUrl(id){ return @json(url('/member')) + '/' + id; },
+            editUrl(id){ return @json(url('/admin/persons')) + '/' + id + '/edit'; },
+            childColumns(p){
+                const kids = p?.children || [];
+                const cols = [
+                    { key:'sons', title:'छोरा', className:'pc-tag-blue', items: kids.filter(c => c.gender === 'male') },
+                    { key:'daughters', title:'छोरी', className:'pc-tag-pink', items: kids.filter(c => c.gender === 'female') },
+                ];
+                const others = kids.filter(c => c.gender !== 'male' && c.gender !== 'female');
+                if (others.length) cols.push({ key:'others', title:'सन्तान', className:'pc-tag-slate', items: others });
+                return cols;
+            },
             assetUrl(path){ return path ? @json(asset('')) + String(path).replace(/^\/+/, '') : ''; },
             parentLabel(p){ return `${p.gender === 'male' ? 'Father' : p.gender === 'female' ? 'Mother' : 'Parent'}: ${p.display_name}`; },
             spouseLabel(p){ return `${p.gender === 'male' ? 'Husband' : p.gender === 'female' ? 'Wife' : 'Spouse'}: ${p.display_name}`; },
@@ -464,6 +651,15 @@
             levelText:    0,
             currentPusta: null,
             canExport:    !!canExport,
+            isAdmin:      !!canExport,
+
+            // unconnected members drawer
+            unconnectedOpen:    false,
+            unconnectedLoading: false,
+            unconnectedTab:     'roots',
+            unconnectedFilter:  '',
+            unconnectedCount:   null,
+            unconnected:        { roots: [], isolated: [] },
             exportOpen:   !!(canExport && exportMode),
             exportBusy:   false,
             exportPaper:  'A4',
@@ -576,6 +772,35 @@
                 });
 
                 this.reload();
+                this.loadUnconnected();
+            },
+
+            /* ═══════════════════════════════
+               UNCONNECTED MEMBERS
+            ═══════════════════════════════ */
+            async loadUnconnected() {
+                this.unconnectedLoading = true;
+                try {
+                    const r = await fetch(@json(route('tree.unconnected')));
+                    const data = await r.json();
+                    this.unconnected = { roots: data.roots || [], isolated: data.isolated || [] };
+                    this.unconnectedCount = this.unconnected.roots.length + this.unconnected.isolated.length;
+                } finally {
+                    this.unconnectedLoading = false;
+                }
+            },
+
+            toggleUnconnected() {
+                this.unconnectedOpen = !this.unconnectedOpen;
+                if (this.unconnectedOpen) this._closePopup();
+            },
+
+            filteredUnconnected() {
+                const list = this.unconnected[this.unconnectedTab] || [];
+                const q = this.unconnectedFilter.trim().toLowerCase();
+                if (!q) return list;
+                return list.filter(u => [u.display_name, u.display_name_np, u.member_no, u.id]
+                    .some(v => String(v || '').toLowerCase().includes(q)));
             },
 
             /* ═══════════════════════════════
@@ -598,17 +823,28 @@
                 if (!data?.id) return;
 
                 const root   = d3.hierarchy(data, d => d.children);
-                const layout = d3.tree().nodeSize([118, 92]);
+                // couples are ~100px wide, so give them extra room next to their siblings
+                const hasSpouse = d => (d.data.spouses?.length || d.data.spouse) ? 1 : 0;
+                const layout = d3.tree()
+                    .nodeSize([118, 112])
+                    .separation((a, b) => (1 + 0.3 * (hasSpouse(a) + hasSpouse(b))) * (a.parent === b.parent ? 1 : 1.15));
                 layout(root);
 
                 this.levelText = (d3.max(root.descendants(), d => d.depth) || 0) + 1;
 
-                /* links */
+                /* links — start below the parent's labels, end above the child's flag */
                 this.g.selectAll('path.link')
                     .data(root.links()).enter()
                     .append('path').attr('class','link')
+                    .attr('stroke', d => this.genderColor(d.target.data.gender))
+                    .attr('stroke-opacity', 0.35)
                     .attr('marker-end','url(#arrow)')
-                    .attr('d', d3.linkVertical().x(d=>d.x).y(d=>d.y));
+                    .attr('d', d => {
+                        const sx = d.source.x, sy = d.source.y + 50;
+                        const tx = d.target.x, ty = d.target.y - 39;
+                        const my = (sy + ty) / 2;
+                        return `M${sx},${sy} C${sx},${my} ${tx},${my} ${tx},${ty}`;
+                    });
 
                 /* nodes */
                 const node = this.g.selectAll('g.node')
@@ -620,7 +856,7 @@
                     const hoverRing = g.append('circle')
                         .attr('r', 22)
                         .attr('fill', 'none')
-                        .attr('stroke', this.genderColor(person.gender))
+                        .attr('stroke', this.personColor(person))
                         .attr('stroke-width', 2.5)
                         .attr('opacity', 0);
 
@@ -652,7 +888,7 @@
                     if (person.photo_path) {
                         g.append('circle').attr('r',18)
                          .attr('fill', '#fff')
-                         .attr('stroke','#e2e8f0').attr('stroke-width',2)
+                         .attr('stroke', this.personColor(person)).attr('stroke-width',2.5)
                          .attr('filter','drop-shadow(0 1px 2px rgba(15,23,42,.18))');
 
                         g.append('image')
@@ -664,7 +900,7 @@
 
                         g.append('circle')
                          .attr('cx', 12).attr('cy', 12).attr('r', 7)
-                         .attr('fill', this.genderColor(person.gender))
+                         .attr('fill', this.personColor(person))
                          .attr('stroke', '#fff').attr('stroke-width', 1.5);
 
                         g.append('text')
@@ -676,7 +912,7 @@
                          .text(this.genderLetter(person.gender));
                     } else {
                         g.append('circle').attr('r',18)
-                         .attr('fill', this.genderColor(person.gender))
+                         .attr('fill', this.personColor(person))
                          .attr('stroke','#fff').attr('stroke-width',3)
                          .attr('filter','drop-shadow(0 1px 2px rgba(15,23,42,.18))');
 
@@ -692,6 +928,7 @@
                     g.append('text')
                      .attr('text-anchor','middle').attr('y',32)
                      .attr('font-size','9.5px').attr('font-weight','700').attr('fill','#0f172a')
+                     .attr('stroke','#f8fafc').attr('stroke-width',3).attr('paint-order','stroke')
                      .text(() => {
                          const nm = person.name || person.display_name || '';
                          return nm.length > 13 ? nm.slice(0,12)+'…' : nm;
@@ -699,8 +936,30 @@
 
                     g.append('text')
                      .attr('text-anchor','middle').attr('y',44)
-                     .attr('font-size','8px').attr('fill','#64748b')
-                     .text(() => person.pusta ? ('पु.'+person.pusta) : '');
+                     .attr('font-size','8px').attr('fill', person.is_buhari ? '#b45309' : '#64748b')
+                     .attr('stroke','#f8fafc').attr('stroke-width',3).attr('paint-order','stroke')
+                     .text(() => [person.is_buhari ? 'बुहारी' : '', person.pusta ? ('पु.'+person.pusta) : '']
+                         .filter(Boolean).join(' · '));
+
+                    // birth-order flag: छोरा १ · जेठो / छोरी २ · माहिली
+                    if (person.birth?.label) {
+                        const tone = {
+                            male:   ['#dbeafe', '#93c5fd', '#1d4ed8'],
+                            female: ['#fce7f3', '#f9a8d4', '#be185d'],
+                        }[person.gender] || ['#ede9fe', '#c4b5fd', '#6d28d9'];
+                        const flag = g.append('g').attr('class','birth-flag').attr('transform','translate(0,-31)');
+                        const rect = flag.append('rect')
+                            .attr('rx', 7.5).attr('ry', 7.5)
+                            .attr('fill', tone[0])
+                            .attr('stroke', tone[1]).attr('stroke-width', 0.8);
+                        const label = flag.append('text')
+                            .attr('text-anchor','middle').attr('y', 3)
+                            .attr('font-size','8.5px').attr('font-weight','800')
+                            .attr('fill', tone[2])
+                            .text(person.birth.label);
+                        const w = (label.node().getComputedTextLength?.() || person.birth.label.length * 5.5) + 12;
+                        rect.attr('x', -w / 2).attr('y', -7.5).attr('width', w).attr('height', 15);
+                    }
                 };
 
                 node.filter(d => d.data.type !== 'union').each((d, i, nodes) => {
@@ -712,6 +971,9 @@
                         gender:       d.data.gender,
                         pusta:        d.data.pusta,
                         photo_path:   d.data.photo_path,
+                        member_no:    d.data.member_no,
+                        is_buhari:    d.data.is_buhari,
+                        birth:        d.data.birth,
                     };
 
                     const rawSpouses = d.data.spouses ||
@@ -724,6 +986,8 @@
                         gender:       s.gender,
                         pusta:        s.pusta,
                         photo_path:   s.photo_path,
+                        member_no:    s.member_no,
+                        is_buhari:    s.is_buhari,
                     }));
 
                     if (spouses.length === 0) {
@@ -736,7 +1000,9 @@
 
                     wrap.append('line')
                         .attr('x1', -31).attr('y1', 0).attr('x2', 31).attr('y2', 0)
-                        .attr('stroke', '#94a3b8').attr('stroke-width', 1.6);
+                        .attr('stroke', '#f59e0b').attr('stroke-opacity', 0.55).attr('stroke-width', 2);
+                    wrap.append('circle').attr('r', 3.5)
+                        .attr('fill', '#fff').attr('stroke', '#f59e0b').attr('stroke-width', 1.5);
 
                     renderMini(wrap.append('g').attr('transform', 'translate(-32,0)'), main);
                     renderMini(wrap.append('g').attr('transform', 'translate(32,0)'), spouses[0]);
@@ -1067,7 +1333,7 @@
 
                 const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
                 style.textContent = `
-                    .link{fill:none;stroke:#cbd5e1;stroke-width:1;marker-end:url(#arrow)}
+                    .link{fill:none;stroke-width:1.3;marker-end:url(#arrow)}
                     text{font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
                     image{image-rendering:auto}
                 `;
@@ -1085,8 +1351,7 @@
                 const clonedGroup = gNode.cloneNode(true);
                 clonedGroup.querySelectorAll('path.link').forEach(path => {
                     path.setAttribute('fill', 'none');
-                    path.setAttribute('stroke', '#cbd5e1');
-                    path.setAttribute('stroke-width', '1');
+                    path.setAttribute('stroke-width', '1.3');
                     path.setAttribute('marker-end', 'url(#arrow)');
                 });
                 clonedGroup.querySelectorAll('text').forEach(text => {

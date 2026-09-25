@@ -44,6 +44,7 @@ Route::get('/सुझाव/धन्यवाद', [FeedbackController::class,
 
 Route::get('/वशावलि', [TreeController::class, 'index'])->name('tree.index');
 Route::get('/tree-json', [TreeController::class, 'treeJson'])->name('tree.json');
+Route::get('/tree-unconnected', [TreeController::class, 'unconnected'])->name('tree.unconnected');
 Route::get('/people/search', [TreeController::class, 'searchPeople'])->name('people.search');
 Route::get('/people/first-by-pusta', [TreeController::class, 'firstPersonByPusta'])->name('people.firstByPusta');
 Route::get('/person/{person}', [TreeController::class, 'personShow'])->name('person.show');
@@ -129,6 +130,8 @@ Route::middleware('admin.auth')->prefix('admin')->name('admin.')->group(function
 
     // Relationships
     Route::get('/relationships/search', [RelationshipController::class, 'searchJson'])->name('relationships.search');
+    Route::get('/relationships/preview', [RelationshipController::class, 'preview'])->name('relationships.preview');
+    Route::get('/relationships/blocked', [RelationshipController::class, 'blocked'])->name('relationships.blocked');
     Route::get('/relationships', [RelationshipController::class, 'index'])->name('relationships.index');
     Route::post('/relationships', [RelationshipController::class, 'store'])->name('relationships.store');
     Route::delete('/relationships/{edge}', [RelationshipController::class, 'destroy'])->name('relationships.destroy');

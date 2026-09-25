@@ -57,13 +57,27 @@ HTML;
 
   <div>
     <label class="form-label">Gender <span class="text-red-500">*</span></label>
-    <select name="gender" class="form-input">
+    <select name="gender" id="personGenderSelect" class="form-input">
       @foreach (['male' => 'Male ♂', 'female' => 'Female ♀', 'other' => 'Other', 'unknown' => 'Unknown'] as $k => $v)
         <option value="{{ $k }}" @selected(old('gender', $p->gender ?? 'unknown') === $k)>{{ $v }}</option>
       @endforeach
     </select>
     @error('gender')<p class="form-error">{{ $message }}</p>@enderror
   </div>
+
+  {{-- सन्तान क्रम: only when editing someone who is a child (has a parent) --}}
+  @if(!empty($orderParent))
+  <div>
+    <label class="form-label">
+      सन्तान क्रम (<span id="personOrderRelation">सन्तान</span>)
+      <span class="font-normal text-slate-400">— {{ $orderParent->display_name }} को</span>
+    </label>
+    <select name="birth_order" id="personBirthOrder" class="form-input"
+      data-current="{{ old('birth_order', $currentOrder ?? '') }}"></select>
+    <p class="text-[11px] text-slate-400 mt-1" id="personOrderTaken"></p>
+    @error('birth_order')<p class="form-error">{{ $message }}</p>@enderror
+  </div>
+  @endif
 
   <div>
     <label class="form-label">पुस्ता (Generation)</label>
@@ -85,7 +99,7 @@ HTML;
 
   {{-- Photo upload --}}
   <div class="md:col-span-2">
-    <label class="form-label">Photo (max 200 KB · JPEG / PNG / WebP)</label>
+    <label class="form-label">Photo (max 500 KB · JPEG / PNG / WebP)</label>
     <div class="flex items-start gap-3">
       {{-- Current / preview image --}}
       <div id="photoThumb"
@@ -97,13 +111,13 @@ HTML;
         @endif
       </div>
       <div class="flex-1">
-        <input type="file" name="photo" id="photoFileInput"
+        <input type="file" name="photo" id="photoFileInput" data-camera
           accept="image/jpeg,image/jpg,image/png,image/webp"
           class="form-input text-sm file:mr-2 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer">
         <input type="hidden" name="photo_path" value="{{ old('photo_path', $p->photo_path ?? '') }}">
         <p class="text-[11px] text-slate-400 mt-1">
           Leave empty to keep existing photo.
-          <span id="photoSizeErr" class="text-red-500 font-medium hidden">⚠ File exceeds 200 KB — please choose a smaller image.</span>
+          <span id="photoSizeErr" class="text-red-500 font-medium hidden">⚠ File exceeds 500 KB — please choose a smaller image.</span>
         </p>
         @error('photo')<p class="form-error">{{ $message }}</p>@enderror
       </div>
@@ -568,7 +582,7 @@ HTML;
   const photoErr   = document.getElementById('photoSizeErr');
 
   photoInput && photoInput.addEventListener('change', function () {
-    const max = 200 * 1024;
+    const max = 500 * 1024;
     if (!this.files || !this.files[0]) return;
     const file = this.files[0];
     if (file.size > max) {
@@ -586,3 +600,46 @@ HTML;
 
 })();
 </script>
+
+@if(!empty($orderParent))
+<script>
+(() => {
+  const gender = document.getElementById('personGenderSelect');
+  const select = document.getElementById('personBirthOrder');
+  const taken = @json($takenOrders ?? []);
+  const WORDS = {
+    male:   ['जेठो', 'माहिलो', 'साहिलो', 'काहिलो', 'ठाहिलो'],
+    female: ['जेठी', 'माहिली', 'साहिली', 'काहिली', 'ठाहिली'],
+  };
+  const RELATION = { male: 'छोरा', female: 'छोरी' };
+  const np = n => String(n).replace(/[0-9]/g, d => '०१२३४५६७८९'[d]);
+  let wanted = parseInt(select.dataset.current, 10) || null;
+
+  function fill() {
+    const g = gender.value;
+    const used = taken[g] || {};
+    const nums = Object.keys(used).map(Number).sort((a, b) => a - b);
+    const max = Math.max(10, (nums.length ? nums[nums.length - 1] : 0) + 1);
+    const free = [];
+    for (let n = 1; n <= max; n++) if (!(n in used)) free.push(n);
+
+    select.innerHTML = '<option value="">— परिवर्तन नगर्ने —</option>' + free.map(n => {
+      const w = (WORDS[g] || [])[n - 1];
+      return `<option value="${n}">${np(n)}${w ? ' — ' + w : ''}</option>`;
+    }).join('');
+    select.value = free.includes(wanted) ? String(wanted) : '';
+
+    document.getElementById('personOrderRelation').textContent = RELATION[g] || 'सन्तान';
+    document.getElementById('personOrderTaken').textContent = nums.length
+      ? 'अरू सन्तान: ' + nums.map(n => `${np(n)} ${used[n]}`).join(', ')
+      : 'अरू कोही सन्तान छैनन्।';
+  }
+
+  gender.addEventListener('change', fill);
+  select.addEventListener('change', () => { wanted = parseInt(select.value, 10) || null; });
+  fill();
+})();
+</script>
+@endif
+
+@include('partials.photo-camera')

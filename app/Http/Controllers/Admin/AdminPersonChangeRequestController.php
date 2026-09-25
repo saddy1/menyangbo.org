@@ -8,6 +8,7 @@ use App\Models\PersonChangeRequest;
 use App\Models\ParentChildEdge;
 use App\Models\UnionModel;
 use App\Support\MemberNumber;
+use App\Support\SiblingOrder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -62,7 +63,8 @@ class AdminPersonChangeRequestController extends Controller
             return back()->with('error', 'A person cannot be married to themselves.');
         }
 
-        DB::transaction(function () use ($r) {
+        $notes = [];
+        DB::transaction(function () use ($r, &$notes) {
 
             $payload = (array)$r->payload;
 
@@ -94,6 +96,9 @@ class AdminPersonChangeRequestController extends Controller
                     $childData['pusta'] = $parentPusta ? (string)($parentPusta + 1) : null;
                 }
 
+                $birthOrder = (int) ($childData['birth_order'] ?? 0);
+                unset($childData['birth_order']);
+
                 $childData['member_no'] = null;
                 $child = Person::create($childData);
                 MemberNumber::assignTo($child);
@@ -103,6 +108,11 @@ class AdminPersonChangeRequestController extends Controller
                     'child_id'      => $child->id,
                     'relation_type' => 'birth',
                 ]);
+
+                // Requested सन्तान क्रम; if another child took it meanwhile, it is left for the admin to set
+                if ($birthOrder && ($error = SiblingOrder::assign($parent, $child, $birthOrder))) {
+                    $notes[] = $error;
+                }
             }
 
             if ($r->type === 'not_listed') {
@@ -172,7 +182,7 @@ class AdminPersonChangeRequestController extends Controller
             ]);
         });
 
-        return back()->with('success', 'Approved');
+        return back()->with('success', trim('Approved. ' . implode(' ', $notes)));
     }
 
     public function reject(PersonChangeRequest $r, Request $request)

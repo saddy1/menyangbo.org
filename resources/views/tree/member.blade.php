@@ -281,10 +281,10 @@
                     @csrf
                     <span class="text-xs font-semibold text-indigo-700 shrink-0">📸 फोटो अपलोड (Admin)</span>
                     <div class="flex-1 min-w-0">
-                        <input type="file" name="photo" id="memberPhotoInput"
+                        <input type="file" name="photo" id="memberPhotoInput" data-camera data-camera-autosubmit
                                accept="image/jpeg,image/jpg,image/png,image/webp" class="text-xs w-full">
-                        <p id="memberPhotoErr" class="text-[10px] text-red-500 mt-0.5" style="display:none">⚠ 200 KB भन्दा बढी छ</p>
-                        <p class="text-[10px] text-slate-400 mt-0.5">Max 200 KB · JPEG / PNG / WebP</p>
+                        <p id="memberPhotoErr" class="text-[10px] text-red-500 mt-0.5" style="display:none">⚠ 500 KB भन्दा बढी छ</p>
+                        <p class="text-[10px] text-slate-400 mt-0.5">Max 500 KB · JPEG / PNG / WebP</p>
                     </div>
                     <button type="submit"
                             class="px-3 py-1.5 bg-indigo-600 text-white text-xs rounded-lg font-semibold hover:bg-indigo-700 shrink-0">
@@ -294,7 +294,7 @@
                 <script>
                 document.getElementById('memberPhotoInput')?.addEventListener('change', function () {
                     const err = document.getElementById('memberPhotoErr');
-                    if (this.files && this.files[0] && this.files[0].size > 200 * 1024) {
+                    if (this.files && this.files[0] && this.files[0].size > 500 * 1024) {
                         err.style.display = 'block';
                         this.value = '';
                     } else if (err) {
@@ -355,36 +355,53 @@
                     </div>
                 </div>
 
-                {{-- Children --}}
+                {{-- Children: sons and daughters in separate columns --}}
+                @php
+                    $allChildren = $children ?? $person->children;
+                    $childColumns = [
+                        ['title' => 'छोरा', 'head' => 'bg-blue-50 text-blue-700 border-blue-100', 'num' => 'bg-blue-600', 'items' => $allChildren->where('gender', 'male')],
+                        ['title' => 'छोरी', 'head' => 'bg-pink-50 text-pink-700 border-pink-100', 'num' => 'bg-pink-500', 'items' => $allChildren->where('gender', 'female')],
+                    ];
+                    $otherChildren = $allChildren->whereNotIn('gender', ['male', 'female']);
+                    if ($otherChildren->isNotEmpty()) {
+                        $childColumns[] = ['title' => 'सन्तान', 'head' => 'bg-slate-50 text-slate-600 border-slate-100', 'num' => 'bg-violet-600', 'items' => $otherChildren];
+                    }
+                @endphp
                 <div>
                     <div class="text-slate-500 text-xs font-semibold mb-2 uppercase tracking-wider">
-                        Children ({{ ($children ?? $person->children)->count() }})
+                        Children ({{ $allChildren->count() }})
                     </div>
-                    <div class="space-y-2">
-                        @forelse(($children ?? $person->children) as $cc)
-                            @php
-                                $childRelation = match($cc->gender ?? 'unknown') {
-                                    'male' => ['label' => 'छोरा', 'class' => 'bg-blue-50 text-blue-700 border-blue-100'],
-                                    'female' => ['label' => 'छोरी', 'class' => 'bg-pink-50 text-pink-700 border-pink-100'],
-                                    default => ['label' => 'सन्तान', 'class' => 'bg-slate-50 text-slate-600 border-slate-100'],
-                                };
-                            @endphp
-                            <a class="group block px-4 py-2.5 rounded-xl border border-slate-100 bg-slate-50 hover:border-slate-300 hover:bg-white transition-all"
-                               href="{{ route('member.page', $cc->id) }}">
-                                <div class="flex items-center justify-between">
-                                    <span class="font-medium group-hover:text-blue-600 truncate">
-                                        {{ $cc->display_name }}
-                                        <span class="ml-1 inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] font-bold {{ $childRelation['class'] }}">
-                                            {{ $childRelation['label'] }}
-                                        </span>
-                                    </span>
-                                    <span class="text-xs text-slate-400">{{ $cc->member_no ?? '#'.$cc->id }}</span>
+                    @if($allChildren->isEmpty())
+                        <div class="text-slate-400 italic text-xs">No records found</div>
+                    @else
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            @foreach($childColumns as $col)
+                                <div class="min-w-0">
+                                    <div class="mb-2 inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-bold {{ $col['head'] }}">
+                                        {{ $col['title'] }} ({{ \App\Support\BirthOrder::npDigits($col['items']->count()) }})
+                                    </div>
+                                    <div class="space-y-2">
+                                        @forelse($col['items'] as $cc)
+                                            <a class="group flex items-center gap-3 px-3 py-2 rounded-xl border border-slate-100 bg-slate-50 hover:border-slate-300 hover:bg-white transition-all"
+                                               href="{{ route('member.page', $cc->id) }}">
+                                                <span class="flex-none w-6 h-6 rounded-full {{ $col['num'] }} text-white text-[11px] font-bold flex items-center justify-center">
+                                                    {{ $cc->birth ? \App\Support\BirthOrder::npDigits($cc->birth['rank']) : '•' }}
+                                                </span>
+                                                <span class="min-w-0 flex-1">
+                                                    <span class="block font-medium group-hover:text-blue-600 truncate">{{ $cc->display_name }}</span>
+                                                    <span class="block text-[11px] text-slate-400 truncate">
+                                                        {{ collect([$cc->birth['word'] ?? null, $cc->member_no ?? '#'.$cc->id])->filter()->implode(' · ') }}
+                                                    </span>
+                                                </span>
+                                            </a>
+                                        @empty
+                                            <div class="text-slate-400 italic text-xs px-1">—</div>
+                                        @endforelse
+                                    </div>
                                 </div>
-                            </a>
-                        @empty
-                            <div class="text-slate-400 italic text-xs">No records found</div>
-                        @endforelse
-                    </div>
+                            @endforeach
+                        </div>
+                    @endif
                 </div>
 
             </div>
@@ -579,7 +596,7 @@
 
                                 <div>
                                     <label class="block text-xs font-medium text-slate-600 mb-1">Gender</label>
-                                    <select name="gender" class="inputCompact max-w-xs bg-white">
+                                    <select name="gender" id="childGenderSelect" class="inputCompact max-w-xs bg-white">
                                         @php $g = old('gender','unknown'); @endphp
                                         <option value="unknown" @selected($g==='unknown')>Unknown</option>
                                         <option value="male" @selected($g==='male')>Male</option>
@@ -589,9 +606,18 @@
                                     @error('gender') <div class="err">{{ $message }}</div> @enderror
                                 </div>
                                 <div>
+                                    <label class="block text-xs font-medium text-slate-600 mb-1">
+                                        सन्तान क्रम (<span id="childOrderRelation">सन्तान</span>)
+                                    </label>
+                                    <select name="birth_order" id="childBirthOrder" class="inputCompact max-w-xs bg-white"
+                                            data-old="{{ old('birth_order') }}"></select>
+                                    <p class="text-[10px] text-slate-400 mt-1" id="childOrderTaken"></p>
+                                    @error('birth_order') <div class="err">{{ $message }}</div> @enderror
+                                </div>
+                                <div>
                                     <label class="block text-xs font-medium text-slate-600 mb-1">Profile Photo</label>
-                                    <input type="file" name="photo" accept="image/jpeg,image/jpg,image/png,image/webp" class="inputCompact js-photo-limit">
-                                    <p class="text-[10px] text-slate-400 mt-1">Max 200 KB</p>
+                                    <input type="file" name="photo" accept="image/jpeg,image/jpg,image/png,image/webp" class="inputCompact js-photo-limit" data-camera>
+                                    <p class="text-[10px] text-slate-400 mt-1">Max 500 KB</p>
                                     @error('photo') <div class="err">{{ $message }}</div> @enderror
                                 </div>
                             </div>
@@ -771,8 +797,8 @@
                                 </div>
                                 <div>
                                     <label class="block text-xs font-medium text-slate-600 mb-1">Profile Photo</label>
-                                    <input type="file" name="photo" accept="image/jpeg,image/jpg,image/png,image/webp" class="inputCompact js-photo-limit">
-                                    <p class="text-[10px] text-slate-400 mt-1">Max 200 KB. Normal users send this as a request.</p>
+                                    <input type="file" name="photo" accept="image/jpeg,image/jpg,image/png,image/webp" class="inputCompact js-photo-limit" data-camera>
+                                    <p class="text-[10px] text-slate-400 mt-1">Max 500 KB. Normal users send this as a request.</p>
                                     @error('photo') <div class="err">{{ $message }}</div> @enderror
                                 </div>
                             </div>
@@ -1140,15 +1166,54 @@ document.addEventListener('keydown', (e) => {
     }
 })();
 
+// सन्तान क्रम for the add-child form: free places depend on the chosen gender
+(() => {
+    const gender = document.getElementById('childGenderSelect');
+    const select = document.getElementById('childBirthOrder');
+    if (!gender || !select) return;
+    const taken = @json($takenOrders ?? []);
+    const WORDS = {
+        male:   ['जेठो', 'माहिलो', 'साहिलो', 'काहिलो', 'ठाहिलो'],
+        female: ['जेठी', 'माहिली', 'साहिली', 'काहिली', 'ठाहिली'],
+    };
+    const RELATION = { male: 'छोरा', female: 'छोरी' };
+    const np = n => String(n).replace(/[0-9]/g, d => '०१२३४५६७८९'[d]);
+    let wanted = parseInt(select.dataset.old, 10) || null;
+
+    function fill() {
+        const g = gender.value;
+        const used = taken[g] || {};
+        const nums = Object.keys(used).map(Number);
+        const max = Math.max(10, (nums.length ? Math.max(...nums) : 0) + 1);
+        const free = [];
+        for (let n = 1; n <= max; n++) if (!(n in used)) free.push(n);
+
+        select.innerHTML = '<option value="">— छान्नुहोस् —</option>' + free.map(n => {
+            const w = (WORDS[g] || [])[n - 1];
+            return `<option value="${n}">${np(n)}${w ? ' — ' + w : ''}</option>`;
+        }).join('');
+        select.value = free.includes(wanted) ? String(wanted) : String(free[0] ?? '');
+
+        document.getElementById('childOrderRelation').textContent = RELATION[g] || 'सन्तान';
+        document.getElementById('childOrderTaken').textContent = nums.length
+            ? 'पहिले नै: ' + nums.sort((a, b) => a - b).map(n => `${np(n)} ${used[n]}`).join(', ')
+            : 'अहिलेसम्म कोही दर्ता छैन।';
+    }
+
+    gender.addEventListener('change', fill);
+    select.addEventListener('change', () => { wanted = parseInt(select.value, 10) || null; });
+    fill();
+})();
+
 document.querySelectorAll('.js-photo-limit').forEach(input => {
     input.addEventListener('change', function () {
         const old = this.parentElement.querySelector('.photo-limit-error');
         if (old) old.remove();
 
-        if (this.files && this.files[0] && this.files[0].size > 200 * 1024) {
+        if (this.files && this.files[0] && this.files[0].size > 500 * 1024) {
             const msg = document.createElement('p');
             msg.className = 'photo-limit-error text-[10px] text-red-500 mt-1 font-medium';
-            msg.textContent = 'फोटो 200 KB भन्दा ठूलो छ। सानो फोटो छान्नुहोस्।';
+            msg.textContent = 'फोटो 500 KB भन्दा ठूलो छ। सानो फोटो छान्नुहोस्।';
             this.insertAdjacentElement('afterend', msg);
             this.value = '';
         }
@@ -1156,4 +1221,5 @@ document.querySelectorAll('.js-photo-limit').forEach(input => {
 });
 </script>
 
+@include('partials.photo-camera')
 @endsection

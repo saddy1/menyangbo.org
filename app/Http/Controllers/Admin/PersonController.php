@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Person;
 use App\Models\UnionModel;
 use App\Support\MemberNumber;
+use App\Support\BirthOrder;
+use App\Support\SiblingOrder;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -165,6 +167,7 @@ class PersonController extends Controller
     {
         $this->mergeNamePartsFromDisplayName($request);
         $data = $this->validatePerson($request);
+        unset($data['birth_order']); // set only through SiblingOrder::assign
         $data['is_deceased'] = $request->boolean('is_deceased');
         $data['member_no'] = null;
         if ($request->boolean('add_union')) {
@@ -195,13 +198,23 @@ class PersonController extends Controller
 
     public function edit(Person $person)
     {
-        return view('admin.persons.edit', compact('person'));
+        $orderParent = SiblingOrder::parentFor($person);
+        $takenOrders = $orderParent ? SiblingOrder::takenByGender($orderParent, $person->id) : [];
+        $currentOrder = null;
+        if ($orderParent) {
+            $ranks = BirthOrder::rank(SiblingOrder::siblings($orderParent)
+                ->filter(fn ($s) => ($s->gender ?: 'unknown') === ($person->gender ?: 'unknown')));
+            $currentOrder = $ranks[$person->id]['rank'] ?? null;
+        }
+
+        return view('admin.persons.edit', compact('person', 'orderParent', 'takenOrders', 'currentOrder'));
     }
 
     public function update(Request $request, Person $person)
     {
         $this->mergeNamePartsFromDisplayName($request);
         $data = $this->validatePerson($request);
+        unset($data['birth_order']); // set only through SiblingOrder::assign
         $data['is_deceased'] = $request->boolean('is_deceased');
 
         if (!$data['is_deceased']) {
@@ -219,7 +232,17 @@ class PersonController extends Controller
             $data['photo_path'] = self::storePhoto($request->file('photo'));
         }
 
+        $birthOrder = (int) $request->input('birth_order');
+        $orderParent = $birthOrder ? SiblingOrder::parentFor($person) : null;
+        if ($orderParent && isset(SiblingOrder::taken($orderParent, $data['gender'], $person->id)[$birthOrder])) {
+            return back()->withErrors(['birth_order' => 'यो सन्तान क्रम पहिले नै अर्को सन्तानको हो। अर्को छान्नुहोस्।'])->withInput();
+        }
+
         $person->update($data);
+
+        if ($orderParent) {
+            SiblingOrder::assign($orderParent, $person, $birthOrder);
+        }
 
         if ($request->boolean('add_union')) {
             $this->createUnionFromRequest($request, $person);
@@ -295,7 +318,8 @@ class PersonController extends Controller
             'death_reason'     => ['nullable','string','max:255'],
 
             'registered_by'    => ['nullable','string','max:100'],
-            'photo'            => ['nullable','image','mimes:jpeg,jpg,png,webp','max:200'],
+            'photo'            => ['nullable','image','mimes:jpeg,jpg,png,webp','max:500'],
+            'birth_order'      => ['nullable','integer','min:1','max:30'],
         ]);
     }
 

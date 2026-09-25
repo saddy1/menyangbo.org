@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Person;
 use App\Models\ParentChildEdge;
 use App\Models\UnionModel;
+use App\Support\BirthOrder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 
@@ -14,7 +15,7 @@ public function memberPage(Person $person)
 {
     $person->load([
         'parents:id,display_name,gender,pusta,birth_date,death_date,is_deceased,photo_path,member_no',
-        'children:id,display_name,gender,pusta,birth_date,is_deceased,member_no',
+        'children:id,display_name,gender,pusta,birth_date,birth_order,is_deceased,member_no',
         'unionsAsSpouse1.spouse2:id,display_name,gender,birth_date,is_deceased,photo_path',
         'unionsAsSpouse2.spouse1:id,display_name,gender,birth_date,is_deceased,photo_path',
         'events',
@@ -42,9 +43,12 @@ public function memberPage(Person $person)
     }
     $spouses = $spouses->unique('id')->values();
     $spouses->each(fn ($spouse) => $spouse->loadMissing([
-        'children:id,display_name,gender,pusta,birth_date,is_deceased',
+        'children:id,display_name,gender,pusta,birth_date,birth_order,is_deceased,member_no',
     ]));
     $children = $this->sharedChildrenFor($person, $spouses);
+    $order = BirthOrder::rank($children);
+    $children = BirthOrder::sortByRank($children, $order);
+    $children->each(fn ($c) => $c->setAttribute('birth', $order[$c->id] ?? null));
 
     return view('tree.member', [
         'person'      => $person,
@@ -54,6 +58,7 @@ public function memberPage(Person $person)
         'grandmother' => $grandmother,
         'spouses'     => $spouses,
         'children'    => $children,
+        'takenOrders' => \App\Support\SiblingOrder::takenByGender($person),
     ]);
 }
 
@@ -67,6 +72,7 @@ public function memberPage(Person $person)
             'gender' => $person->gender ?: 'unknown',
             'pusta' => $person->pusta,
             'photo_path' => $person->photo_path,
+            'member_no' => $person->member_no,
         ];
     }
 
@@ -167,11 +173,11 @@ public function memberPage(Person $person)
     public function personShow(Person $person)
     {
         $person->load([
-            'parents:id,display_name,display_name_np,display_name_limbu,gender,pusta,photo_path',
-            'parents.parents:id,display_name,display_name_np,display_name_limbu,gender,pusta,photo_path',
-            'children:id,display_name,display_name_np,display_name_limbu,gender,pusta,photo_path',
-            'unionsAsSpouse1.spouse2:id,display_name,display_name_np,display_name_limbu,gender,pusta,photo_path',
-            'unionsAsSpouse2.spouse1:id,display_name,display_name_np,display_name_limbu,gender,pusta,photo_path',
+            'parents:id,display_name,display_name_np,display_name_limbu,gender,pusta,photo_path,member_no',
+            'parents.parents:id,display_name,display_name_np,display_name_limbu,gender,pusta,photo_path,member_no',
+            'children:id,display_name,display_name_np,display_name_limbu,gender,pusta,photo_path,member_no,birth_date,birth_order',
+            'unionsAsSpouse1.spouse2:id,display_name,display_name_np,display_name_limbu,gender,pusta,photo_path,member_no',
+            'unionsAsSpouse2.spouse1:id,display_name,display_name_np,display_name_limbu,gender,pusta,photo_path,member_no',
         ]);
 
         $father = $person->parents->firstWhere('gender', 'male');
@@ -185,12 +191,26 @@ public function memberPage(Person $person)
             ->unique('id')
             ->values();
         $spouses->each(fn ($spouse) => $spouse->loadMissing([
-            'children:id,display_name,display_name_np,display_name_limbu,gender,pusta,photo_path',
+            'children:id,display_name,display_name_np,display_name_limbu,gender,pusta,photo_path,member_no,birth_date,birth_order',
         ]));
         $children = $this->sharedChildrenFor($person, $spouses);
+        $childOrder = BirthOrder::rank($children);
+        $children = BirthOrder::sortByRank($children, $childOrder);
+
+        // This person's own place among siblings (via father, else mother)
+        $birth = null;
+        if ($parent = $father ?? $mother) {
+            $siblings = $parent->children()
+                ->select('persons.id', 'persons.gender', 'persons.birth_date', 'persons.birth_order')
+                ->get();
+            $birth = BirthOrder::rank($siblings)[$person->id] ?? null;
+        }
 
         return response()->json([
             'id' => (string)$person->id,
+            'member_no' => $person->member_no,
+            'is_buhari' => $this->isBuhari($person->gender, $spouses->isNotEmpty(), $person->parents->isNotEmpty()),
+            'birth' => $birth,
             'display_name' => $person->display_name,
             'display_name_np' => $person->display_name_np,
             'display_name_limbu' => $person->display_name_limbu,
@@ -206,7 +226,87 @@ public function memberPage(Person $person)
             'grandfather' => $grandfather ? $this->tinyPerson($grandfather) : null,
             'parents' => ($person->parents ?? collect())->map(fn($p) => $this->tinyPerson($p))->values(),
             'spouses' => $spouses->map(fn($s) => $this->tinyPerson($s))->values(),
-            'children' => $children->map(fn($c) => $this->tinyPerson($c))->values(),
+            'children' => $children->map(fn($c) => $this->tinyPerson($c) + ['birth' => $childOrder[$c->id] ?? null])->values(),
+        ]);
+    }
+
+    /** A married-in woman (बुहारी): female, has a spouse, and no parents recorded in the family. */
+    private function isBuhari(?string $gender, bool $hasSpouse, bool $hasParents): bool
+    {
+        return $gender === 'female' && $hasSpouse && !$hasParents;
+    }
+
+    /**
+     * People not connected to the main tree:
+     *  - roots:    no parents but have children (a separate family line to be joined)
+     *  - isolated: no parents, no children, and no spouse who is connected
+     */
+    public function unconnected()
+    {
+        $people = Person::query()
+            ->select('id', 'display_name', 'display_name_np', 'gender', 'pusta', 'member_no', 'photo_path')
+            ->orderBy('id')
+            ->get()
+            ->keyBy('id');
+
+        $edges = ParentChildEdge::query()->select('parent_id', 'child_id')->get();
+        $hasParent = $edges->pluck('child_id')->flip();
+        $hasChild  = $edges->pluck('parent_id')->flip();
+
+        $spousesOf = [];
+        foreach (UnionModel::query()->select('spouse1_id', 'spouse2_id')->get() as $u) {
+            $spousesOf[(int) $u->spouse1_id][] = (int) $u->spouse2_id;
+            $spousesOf[(int) $u->spouse2_id][] = (int) $u->spouse1_id;
+        }
+
+        $mainRootId = (int) $people->keys()->first();
+        $connected  = fn (int $id) => isset($hasParent[$id]) || isset($hasChild[$id]);
+
+        $roots = [];
+        $isolated = [];
+        foreach ($people as $id => $p) {
+            $id = (int) $id;
+            if (isset($hasParent[$id]) || $id === $mainRootId) continue;
+
+            $spouses = $spousesOf[$id] ?? [];
+            if (in_array($mainRootId, $spouses, true)) continue;
+
+            if (isset($hasChild[$id])) {
+                // Skip married-in spouses (their partner has parents) and list a founding couple once
+                $skip = false;
+                foreach ($spouses as $sid) {
+                    if (isset($hasParent[$sid])) { $skip = true; break; }
+                    if (isset($hasChild[$sid]) && isset($people[$sid])) {
+                        $spouseIsMale = $people[$sid]->gender === 'male';
+                        if ($spouseIsMale && $p->gender !== 'male') { $skip = true; break; }
+                        if ($spouseIsMale === ($p->gender === 'male') && $sid < $id) { $skip = true; break; }
+                    }
+                }
+                if (!$skip) $roots[] = $p;
+                continue;
+            }
+
+            foreach ($spouses as $sid) {
+                if ($connected($sid)) continue 2;
+            }
+            $isolated[] = $p;
+        }
+
+        $map = fn ($p) => [
+            'id'              => (string) $p->id,
+            'display_name'    => $p->display_name,
+            'display_name_np' => $p->display_name_np,
+            'gender'          => $p->gender ?: 'unknown',
+            'pusta'           => $p->pusta,
+            'member_no'       => $p->member_no,
+            'photo_path'      => $p->photo_path,
+            'spouse_names'    => collect($spousesOf[(int) $p->id] ?? [])
+                ->map(fn ($sid) => $people[$sid]->display_name ?? null)->filter()->values(),
+        ];
+
+        return response()->json([
+            'roots'    => array_map($map, $roots),
+            'isolated' => array_map($map, $isolated),
         ]);
     }
 
@@ -239,7 +339,7 @@ public function memberPage(Person $person)
 
         // Load all people minimal fields
         $people = Person::query()
-            ->select('id','display_name','display_name_np','display_name_limbu','gender','pusta','birth_date','is_deceased','photo_path')
+            ->select('id','display_name','display_name_np','display_name_limbu','gender','pusta','birth_date','birth_order','is_deceased','photo_path','member_no')
             ->get()
             ->keyBy('id');
 
@@ -266,6 +366,24 @@ public function memberPage(Person $person)
             $childrenByParent[$pid] = $childIds;
         }
 
+        $hasParent = [];
+        foreach ($edges as $e) $hasParent[(int)$e->child_id] = true;
+
+        // Birth order among siblings — father's list first so half-siblings rank together
+        $birthOrder = [];
+        $parentIds = array_keys($childrenByParent);
+        usort($parentIds, fn ($a, $b) => (($people[$b]->gender ?? null) === 'male') <=> (($people[$a]->gender ?? null) === 'male'));
+        foreach ($parentIds as $pid) {
+            $siblings = array_filter(array_map(fn ($cid) => $people[$cid] ?? null, $childrenByParent[$pid]));
+            $birthOrder += BirthOrder::rank($siblings);
+        }
+
+        // Children order in the tree: sons (eldest first), then daughters, then others
+        $genderRank = fn (int $id) => match ($people[$id]->gender ?? null) { 'male' => 0, 'female' => 1, default => 2 };
+        $byGenderThenBirth = fn (array $ids, array $ranks) => collect($ids)
+            ->sortBy(fn ($id, $i) => [$genderRank((int)$id), $ranks[$id]['rank'] ?? PHP_INT_MAX, $i])
+            ->values()->all();
+
         // Unions
         $unions = UnionModel::query()->select('id','spouse1_id','spouse2_id')->get();
 
@@ -286,8 +404,9 @@ public function memberPage(Person $person)
             return $out;
         };
 
-        $buildPersonNode = function(int $pid, int $level, array $stack = []) use (
-            &$buildPersonNode, $depth, $people, $childrenByParent, $unionsByPerson, $commonChildren
+        $buildPersonNode = function(int $pid, int $level, array $stack = [], ?array $birth = null) use (
+            &$buildPersonNode, $depth, $people, $childrenByParent, $unionsByPerson, $commonChildren,
+            $birthOrder, $hasParent, $byGenderThenBirth
         ) {
             if (!isset($people[$pid])) return null;
             if (isset($stack[$pid])) return null; // prevent loops
@@ -304,7 +423,10 @@ public function memberPage(Person $person)
                 'gender' => $p->gender ?: 'unknown',
                 'pusta' => $p->pusta,
                 'photo_path' => $p->photo_path,
+                'member_no' => $p->member_no,
                 'is_deceased' => (bool)($p->is_deceased ?? false),
+                'is_buhari' => $this->isBuhari($p->gender, !empty($unionsByPerson[$pid]), isset($hasParent[$pid])),
+                'birth' => $birth ?? $birthOrder[$pid] ?? null,
                 'children' => [],
             ];
 
@@ -331,7 +453,9 @@ public function memberPage(Person $person)
                         'gender'   => $sp->gender ?: 'unknown',
                         'pusta'    => $sp->pusta,
                         'photo_path' => $sp->photo_path,
+                        'member_no' => $sp->member_no,
                         'is_deceased' => (bool)($sp->is_deceased ?? false),
+                        'is_buhari' => $this->isBuhari($sp->gender, true, isset($hasParent[$spouseId])),
                     ];
 
                     foreach ($commonChildren($pid, $spouseId) as $cid) {
@@ -348,18 +472,18 @@ public function memberPage(Person $person)
                 $node['spouse']  = $spousesArr[0]; // backward compat
             }
 
-            // ✅ children: couple kids first, then remaining
-            $added = [];
-
-            foreach ($unionKids as $cid) {
-                $added[$cid] = true;
-                $childNode = $buildPersonNode((int)$cid, $level + 1, $stack);
-                if ($childNode) $node['children'][] = $childNode;
+            // ✅ children: couple kids first, then remaining; sons before daughters
+            $kidIds = $unionKids;
+            $added = array_fill_keys($unionKids, true);
+            foreach (($childrenByParent[$pid] ?? []) as $cid) {
+                if (!isset($added[$cid])) $kidIds[] = $cid;
             }
 
-            foreach (($childrenByParent[$pid] ?? []) as $cid) {
-                if (isset($added[$cid])) continue;
-                $childNode = $buildPersonNode((int)$cid, $level + 1, $stack);
+            // Rank among this parent's own children (robust to a child wrongly linked to two fathers)
+            $kidRanks = BirthOrder::rank(array_filter(array_map(fn ($cid) => $people[$cid] ?? null, $childrenByParent[$pid] ?? [])));
+
+            foreach ($byGenderThenBirth($kidIds, $kidRanks) as $cid) {
+                $childNode = $buildPersonNode((int)$cid, $level + 1, $stack, $kidRanks[$cid] ?? null);
                 if ($childNode) $node['children'][] = $childNode;
             }
 
