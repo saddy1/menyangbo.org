@@ -22,7 +22,8 @@ The built CSS/JS (`public/build`) is in git, so **no Node/npm is needed on the s
 ## Requirements
 
 - SSH access, or cPanel → **Terminal**.
-- **PHP 8.2 or newer**. Set it in cPanel → MultiPHP Manager, or pass `PHP=/opt/cpanel/ea-php82/root/usr/bin/php`.
+- **PHP 8.2, 8.3 or 8.4**. The locked packages don't support 8.1 or 8.5. Set it in cPanel → MultiPHP Manager
+  (and for the command line, pass `PHP=/opt/cpanel/ea-php83/root/usr/bin/php` if plain `php` is a different version).
 - `git`, `rsync` and `mysqldump`. These are available on most cPanel hosts.
 
 ## First-time setup

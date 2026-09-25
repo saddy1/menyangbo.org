@@ -31,6 +31,7 @@ BRANCH="${BRANCH:-main}"
 REF="${REF:-}"                                         # optional commit/tag to deploy (rollback)
 PHP="${PHP:-php}"                                      # e.g. /opt/cpanel/ea-php82/root/usr/bin/php
 COMPOSER="${COMPOSER:-}"                               # auto-detected when empty
+COMPOSER_FLAGS="${COMPOSER_FLAGS:-}"                   # extra flags, e.g. --ignore-platform-req=php
 BACKUP_DIR="${BACKUP_DIR:-$HOME/menyangbo-backups}"
 BACKUP_UPLOADS="${BACKUP_UPLOADS:-1}"                  # 1 = also tar the upload folders before deploying
 KEEP_BACKUPS="${KEEP_BACKUPS:-10}"
@@ -49,8 +50,10 @@ command -v rsync >/dev/null || die "rsync not found (ask hosting support, or dep
 [ -f "$APP_DIR/artisan" ] || die "No Laravel app at APP_DIR=$APP_DIR (set APP_DIR=/path/to/live/app)"
 [ -f "$APP_DIR/.env" ]    || die "$APP_DIR/.env missing — the live .env must stay on the server"
 "$PHP" -v >/dev/null 2>&1 || die "PHP not runnable: $PHP"
-"$PHP" -r 'exit(version_compare(PHP_VERSION, "8.2.0", ">=") ? 0 : 1);' \
-  || die "PHP 8.2+ needed ($("$PHP" -r 'echo PHP_VERSION;') found). Pick PHP 8.2+ in cPanel → MultiPHP Manager, or run with PHP=/opt/cpanel/ea-php82/root/usr/bin/php"
+# composer.lock needs PHP 8.2 – 8.4 (symfony 7 wants ≥ 8.2, nette/schema allows ≤ 8.4)
+"$PHP" -r 'exit(version_compare(PHP_VERSION, "8.2.0", ">=") && version_compare(PHP_VERSION, "8.5.0", "<") ? 0 : 1);' \
+  || [ -n "$COMPOSER_FLAGS" ] \
+  || die "PHP 8.2–8.4 needed ($("$PHP" -r 'echo PHP_VERSION;') found). Pick it in cPanel → MultiPHP Manager, or run with PHP=/opt/cpanel/ea-php83/root/usr/bin/php"
 
 STAMP="$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$BACKUP_DIR"
@@ -158,7 +161,7 @@ if [ -z "$COMPOSER" ]; then
     COMPOSER="$PHP $HOME/composer.phar"
   fi
 fi
-( cd "$APP_DIR" && $COMPOSER install --no-dev --optimize-autoloader --no-interaction --no-progress )
+( cd "$APP_DIR" && $COMPOSER install --no-dev --optimize-autoloader --no-interaction --no-progress $COMPOSER_FLAGS )
 
 # ── 6. Database changes + caches ───────────────────────────────────────────────
 say "Running migrations"
