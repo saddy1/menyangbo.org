@@ -7,8 +7,8 @@
 #   REF=abc1234 bash deploy.sh   deploy a specific (e.g. older) commit instead of the latest
 #
 # How it works: the repo is cloned into a separate folder ($REPO_DIR) and the code is
-# rsync'ed into the live app ($APP_DIR). Uploaded files, .env, storage/ and vendor/ are
-# excluded, so rsync never overwrites or deletes them. The database is dumped before
+# copied into the live app ($APP_DIR) with rsync, or with git when rsync is missing.
+# Uploaded files, .env, storage/ and vendor/ are never overwritten or deleted. The database is dumped before
 # migrations run. See deploy/README.md for first-time setup.
 
 set -euo pipefail
@@ -46,7 +46,9 @@ die()  { printf '\033[1;31mxx %s\033[0m\n' "$*" >&2; exit 1; }
 
 # ── Checks ──────────────────────────────────────────────────────────────────────
 command -v git   >/dev/null || die "git not found"
-command -v rsync >/dev/null || die "rsync not found (ask hosting support, or deploy with cPanel Git Version Control)"
+# rsync when available; otherwise copy with git (many cPanel hosts have no rsync)
+SYNC_METHOD="${SYNC_METHOD:-$(command -v rsync >/dev/null && echo rsync || echo git)}"
+[ "$SYNC_METHOD" = git ] && [ -n "$PUBLIC_DIR" ] && die "PUBLIC_DIR needs rsync, which this server doesn't have"
 [ -f "$APP_DIR/artisan" ] || die "No Laravel app at APP_DIR=$APP_DIR (set APP_DIR=/path/to/live/app)"
 [ -f "$APP_DIR/.env" ]    || die "$APP_DIR/.env missing — the live .env must stay on the server"
 "$PHP" -v >/dev/null 2>&1 || die "PHP not runnable: $PHP"
@@ -72,7 +74,7 @@ echo "Commit: $(git -C "$REPO_DIR" log -1 --format='%h %s (%cr)')"
 # ── rsync rules: what must never be overwritten or deleted on the server ───────
 EXCLUDES=(
   --exclude=/.git/ --exclude=/.github/ --exclude=/node_modules/ --exclude=/tests/
-  --exclude=/.env --exclude=/storage/ --exclude=/vendor/
+  --exclude=/.env --exclude=/storage/ --exclude=/vendor/ --exclude=/.deployed-commit
   --exclude='/bootstrap/cache/*.php'
   # hosting files cPanel creates next to the app
   --exclude=/public/.htaccess --exclude=/.htaccess --exclude=.user.ini --exclude=php.ini
@@ -90,9 +92,43 @@ sync_dir() {
   grep -v '^\.[^ ]* ' "$RSYNC_LOG" | tail -n "${SHOW_LINES:-60}" || true
 }
 
+# ── Copy with git (no rsync) ──────────────────────────────────────────────────
+# Writes every file tracked in the repo into $APP_DIR. Files git doesn't track on the server
+# (uploads, .env, zips …) are never touched. Code files the new version no longer has are removed:
+# found from the previous deploy (.deployed-commit) or, the first time, the server's own git checkout.
+PROTECTED_RE='^(public/(photos|notices|events|committee-photos|banners|media|popups|storage)/|\.env$|storage/|vendor/|node_modules/|public/\.htaccess$|\.htaccess$|\.git/)'
+new_files() { git -C "$REPO_DIR" ls-tree -r --name-only HEAD; }
+old_files() {
+  local prev=""; [ -f "$APP_DIR/.deployed-commit" ] && prev="$(cat "$APP_DIR/.deployed-commit")"
+  if [ -n "$prev" ] && git -C "$REPO_DIR" cat-file -e "$prev^{commit}" 2>/dev/null; then
+    git -C "$REPO_DIR" ls-tree -r --name-only "$prev"
+  elif [ -d "$APP_DIR/.git" ]; then
+    git -C "$APP_DIR" ls-files 2>/dev/null || true
+  fi
+}
+removed_files() { comm -23 <(old_files | sort -u) <(new_files | sort -u) | grep -Ev "$PROTECTED_RE" || true; }
+
+git_sync() {  # $1 = dry | real
+  local idx; idx="$(mktemp)"; rm -f "$idx"
+  GIT_INDEX_FILE="$idx" git -C "$REPO_DIR" read-tree HEAD
+  for f in public/.htaccess .htaccess; do     # keep the server's own .htaccess (cPanel PHP handler)
+    [ -e "$APP_DIR/$f" ] && GIT_INDEX_FILE="$idx" git -C "$REPO_DIR" update-index --force-remove -- "$f"
+  done
+  if [ "$1" = dry ]; then
+    # index vs the live folder: M = would be updated, D = missing on the server = would be added
+    GIT_INDEX_FILE="$idx" git -C "$REPO_DIR" --work-tree="$APP_DIR" diff --name-status --no-renames \
+      | sed -e 's/^M\t/  update   /' -e 's/^D\t/  new      /'
+    removed_files | sed 's/^/*deleting /'
+  else
+    GIT_INDEX_FILE="$idx" git -C "$REPO_DIR" checkout-index -a -f --prefix="$APP_DIR/"
+    removed_files | while IFS= read -r f; do rm -f -- "$APP_DIR/$f" && echo "*deleting $f"; done
+  fi
+  rm -f "$idx"
+}
+
 if [ "$DRY_RUN" = "1" ]; then
-  say "DRY RUN — changes that would be made to $APP_DIR (nothing is written)"
-  SHOW_LINES=100000 sync_dir "${EXCLUDES[@]}" "$REPO_DIR/" "$APP_DIR/"
+  say "DRY RUN ($SYNC_METHOD) — changes that would be made to $APP_DIR (nothing is written)"
+  if [ "$SYNC_METHOD" = git ]; then git_sync dry; else SHOW_LINES=100000 sync_dir "${EXCLUDES[@]}" "$REPO_DIR/" "$APP_DIR/"; fi
   if [ -n "$PUBLIC_DIR" ]; then
     say "DRY RUN — changes to $PUBLIC_DIR"
     PUB_EX=(--exclude=/index.php --exclude=/.htaccess --exclude=.user.ini --exclude=error_log --exclude=/.well-known/ --exclude=/cgi-bin/)
@@ -136,8 +172,9 @@ say "Maintenance mode on"
 trap 'warn "Deploy failed — site is still in maintenance mode. Fix the error, then run: cd $APP_DIR && $PHP artisan up"' ERR
 
 # ── 4. Copy code (uploads, .env, storage, vendor are excluded) ─────────────────
-say "Copying code into $APP_DIR"
-sync_dir "${EXCLUDES[@]}" "$REPO_DIR/" "$APP_DIR/"
+say "Copying code into $APP_DIR ($SYNC_METHOD)"
+if [ "$SYNC_METHOD" = git ]; then git_sync real | tail -n 60; else sync_dir "${EXCLUDES[@]}" "$REPO_DIR/" "$APP_DIR/"; fi
+git -C "$REPO_DIR" rev-parse HEAD > "$APP_DIR/.deployed-commit"
 
 if [ -n "$PUBLIC_DIR" ]; then
   say "Copying public assets into $PUBLIC_DIR (index.php and .htaccess kept)"
@@ -179,8 +216,8 @@ trap - ERR
 ( cd "$APP_DIR" && "$PHP" artisan up )
 
 # keep only the newest $KEEP_BACKUPS deploys' backups (uploads may be 2 files per deploy)
-ls -1t "$BACKUP_DIR"/db-*.sql.gz 2>/dev/null | tail -n +$((KEEP_BACKUPS + 1)) | xargs -r rm -f
-ls -1t "$BACKUP_DIR"/uploads-*.tar.gz 2>/dev/null | tail -n +$((KEEP_BACKUPS * 2 + 1)) | xargs -r rm -f
+{ ls -1t "$BACKUP_DIR"/db-*.sql.gz 2>/dev/null || true; } | tail -n +$((KEEP_BACKUPS + 1)) | xargs -r rm -f
+{ ls -1t "$BACKUP_DIR"/uploads-*.tar.gz 2>/dev/null || true; } | tail -n +$((KEEP_BACKUPS * 2 + 1)) | xargs -r rm -f
 
 
 say "Done — deployed $(git -C "$REPO_DIR" log -1 --format='%h %s')"
