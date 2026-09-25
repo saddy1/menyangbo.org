@@ -181,6 +181,7 @@
                     'mark_deceased'  => 'bg-gray-100 text-gray-600',
                     'update_profile' => 'bg-purple-100 text-purple-600',
                     'add_union'      => 'bg-rose-100 text-rose-500',
+                    'link_parent'    => 'bg-teal-100 text-teal-600',
                     default          => 'bg-gray-100 text-gray-500',
                   } }}">
                   <i class="fas {{ match($req->type) {
@@ -188,6 +189,7 @@
                     'mark_deceased'  => 'fa-cross',
                     'update_profile' => 'fa-pen',
                     'add_union'      => 'fa-heart',
+                    'link_parent'    => 'fa-link',
                     default          => 'fa-file',
                   } }} text-xs"></i>
                 </div>

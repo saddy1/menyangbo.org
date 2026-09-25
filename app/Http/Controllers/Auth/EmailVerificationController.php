@@ -16,7 +16,7 @@ class EmailVerificationController extends Controller
     public function verify(EmailVerificationRequest $request)
     {
         $request->fulfill();
-        return redirect()->route('home')->with('success', 'इमेल सफलतापूर्वक प्रमाणित भयो!');
+        return redirect()->route('home')->with('success', __('इमेल सफलतापूर्वक प्रमाणित भयो!'));
     }
 
     public function resend(Request $request)

@@ -8,6 +8,8 @@ use App\Models\PersonChangeRequest;
 use App\Models\UnionModel;
 use App\Support\MemberNumber;
 use App\Support\SiblingOrder;
+use App\Support\SpouseDetails;
+use App\Support\Lineage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -44,7 +46,7 @@ class UserPersonChangeRequestController extends Controller
         $file->move(public_path('photos'), $filename);
         $person->update(['photo_path' => 'photos/' . $filename]);
 
-        return back()->with('success_message', 'फोटो सफलतापूर्वक अपलोड गरियो।');
+        return back()->with('success_message', \App\Support\FrontendLocale::text('फोटो सफलतापूर्वक अपलोड गरियो।'));
     }
 
     // ── Mark Deceased ─────────────────────────────────────────────────────────
@@ -53,7 +55,7 @@ class UserPersonChangeRequestController extends Controller
     {
         $person = Person::query()->findOrFail($person);
         if ($person->is_deceased) {
-            return back()->with('success_message', $person->display_name . ' पहिले नै मृतकको रूपमा दर्ता छ।');
+            return back()->with('success_message', $person->display_name . \App\Support\FrontendLocale::text(' पहिले नै मृतकको रूपमा दर्ता छ।'));
         }
 
         $validated = $request->validate([
@@ -67,7 +69,7 @@ class UserPersonChangeRequestController extends Controller
 
         if (empty($validated['death_date_ad']) && empty($validated['death_date_bs'])) {
             return back()
-                ->withErrors(['death_date_ad' => 'मृत्यु मिति (A.D. वा B.S.) अनिवार्य छ।'])
+                ->withErrors(['death_date_ad' => \App\Support\FrontendLocale::text('मृत्यु मिति (A.D. वा B.S.) अनिवार्य छ।')])
                 ->withInput()->with('open_modal', 'death');
         }
 
@@ -81,7 +83,7 @@ class UserPersonChangeRequestController extends Controller
                 'death_reason' => $validated['death_reason']  ?? null,
             ]);
             return redirect()->route('member.page', $person->id)
-                ->with('success_message', $person->display_name . ' मृतकको रूपमा दर्ता गरियो।');
+                ->with('success_message', $person->display_name . \App\Support\FrontendLocale::text(' मृतकको रूपमा दर्ता गरियो।'));
         }
 
         // ── Member: create change request ──────────────────────────────────────
@@ -105,7 +107,56 @@ class UserPersonChangeRequestController extends Controller
         $this->sendNotificationEmail($req, $person);
 
         return redirect()->route('member.page', $person->id)
-            ->with('success_message', $person->display_name . ' को मृत्यु सुतक जानकारी जारी गरियो।');
+            ->with('success_message', $person->display_name . \App\Support\FrontendLocale::text(' को मृत्यु सुतक जानकारी जारी गरियो।'));
+    }
+
+    // ── Link an existing person as parent (for people with no parent yet) ────
+
+    public function linkParent(Request $request, $person)
+    {
+        $child = Person::query()->findOrFail($person);
+
+        $validated = $request->validate([
+            'parent_id'     => ['required', 'integer', 'exists:persons,id'],
+            'relation_type' => ['nullable', 'in:birth,adoption'],
+            'note'          => ['nullable', 'string', 'max:500'],
+        ]);
+        $parent = Person::findOrFail($validated['parent_id']);
+        $relation = $validated['relation_type'] ?? 'birth';
+
+        if ($problem = Lineage::linkProblem($parent->id, $child->id)) {
+            return back()->withErrors(['parent_id' => $problem])->withInput();
+        }
+
+        // ── Admin: link directly ────────────────────────────────────────────────
+        if (Auth::user()->isAdmin()) {
+            ParentChildEdge::create(['parent_id' => $parent->id, 'child_id' => $child->id, 'relation_type' => $relation]);
+            $msg = $parent->display_name . \App\Support\FrontendLocale::text(' लाई ') . $child->display_name . \App\Support\FrontendLocale::text(' को अभिभावकको रूपमा जोडियो।');
+            if (empty($child->pusta) && ($p = $this->pustaToInt($parent->pusta))) {
+                $child->update(['pusta' => \App\Support\BirthOrder::npDigits($p + 1)]);
+                $msg .= \App\Support\FrontendLocale::text(' पुस्ता ') . $child->pusta . \App\Support\FrontendLocale::text(' राखियो।');
+            }
+            return redirect()->route('member.page', $child->id)->with('success_message', $msg);
+        }
+
+        // ── Member: request ─────────────────────────────────────────────────────
+        $req = PersonChangeRequest::create([
+            'user_id'         => Auth::id(),
+            'person_id'       => $child->id,
+            'type'            => 'link_parent',
+            'payload'         => [
+                'parent_id'     => $parent->id,
+                'parent_name'   => $parent->display_name,
+                'relation_type' => $relation,
+                'note'          => $validated['note'] ?? null,
+            ],
+            'submitted_name'  => $this->submittedName($validated),
+            'submitted_email' => Auth::user()->email,
+        ]);
+        $this->sendNotificationEmail($req, $child);
+
+        return redirect()->route('member.page', $child->id)
+            ->with('success_message', $parent->display_name . \App\Support\FrontendLocale::text(' लाई अभिभावक जोड्ने अनुरोध पठाइयो।'));
     }
 
     // ── Add Child ─────────────────────────────────────────────────────────────
@@ -135,13 +186,8 @@ class UserPersonChangeRequestController extends Controller
             'bio'             => ['nullable', 'string', 'max:5000'],
             'photo'           => ['nullable', 'image', 'mimes:jpeg,jpg,png,webp', 'max:500'],
             'submitted_name'  => ['nullable', 'string', 'max:255'],
-            'birth_order'     => ['nullable', 'integer', 'min:1', 'max:30'],
+            'birth_order'     => ['nullable', 'integer', 'min:1', 'max:' . SiblingOrder::MAX],
         ]);
-        if (!empty($validated['birth_order']) && isset(SiblingOrder::taken($parent, $validated['gender'])[(int) $validated['birth_order']])) {
-            return back()
-                ->withErrors(['birth_order' => 'यो सन्तान क्रम पहिले नै अर्को सन्तानको हो। अर्को छान्नुहोस्।'])
-                ->withInput()->with('open_modal', 'child');
-        }
         $validated = array_merge($validated, $this->namePartsFromDisplayName($validated['display_name']));
         if ($request->hasFile('photo')) {
             $validated['photo_path'] = $this->storeRequestPhoto($request->file('photo'), 'child');
@@ -152,7 +198,7 @@ class UserPersonChangeRequestController extends Controller
             $childData = collect($validated)->except(['submitted_name', 'photo', 'birth_order'])->filter()->toArray();
             if (empty($childData['pusta'])) {
                 $parentPusta = $this->pustaToInt($parent->pusta);
-                if ($parentPusta) $childData['pusta'] = (string)($parentPusta + 1);
+                if ($parentPusta) $childData['pusta'] = \App\Support\BirthOrder::npDigits($parentPusta + 1);
             }
             $childData['member_no'] = null;
             $child = Person::create($childData);
@@ -165,7 +211,7 @@ class UserPersonChangeRequestController extends Controller
                 SiblingOrder::assign($parent, $child, (int) $validated['birth_order']);
             }
             return redirect()->route('member.page', $parent->id)
-                ->with('success_message', $child->display_name . ' सन्तानको रूपमा सिधै थपियो।');
+                ->with('success_message', $child->display_name . \App\Support\FrontendLocale::text(' सन्तानको रूपमा सिधै थपियो।'));
         }
 
         // ── Member: change request ──────────────────────────────────────────────
@@ -174,7 +220,7 @@ class UserPersonChangeRequestController extends Controller
         $payload = collect($validated)->except(['submitted_name', 'photo'])->toArray();
         if (empty($payload['pusta'])) {
             $parentPusta = $this->pustaToInt($parent->pusta);
-            if ($parentPusta) $payload['pusta'] = (string)($parentPusta + 1);
+            if ($parentPusta) $payload['pusta'] = \App\Support\BirthOrder::npDigits($parentPusta + 1);
         }
 
         $req = PersonChangeRequest::create([
@@ -189,7 +235,7 @@ class UserPersonChangeRequestController extends Controller
         $this->sendNotificationEmail($req, $parent);
 
         return redirect()->route('member.page', ['person' => $parent->id])
-            ->with('success_message', 'नयाँ सन्तान जानकारी ' . $parent->display_name . ' को लागि पठाइयो।');
+            ->with('success_message', \App\Support\FrontendLocale::text('नयाँ सन्तान जानकारी ') . $parent->display_name . \App\Support\FrontendLocale::text(' को लागि पठाइयो।'));
     }
 
     // ── Profile Update ────────────────────────────────────────────────────────
@@ -218,7 +264,21 @@ class UserPersonChangeRequestController extends Controller
             'photo'           => ['nullable', 'image', 'mimes:jpeg,jpg,png,webp', 'max:500'],
             'submitted_name'  => ['nullable', 'string', 'max:255'],
             'submitted_note'  => ['nullable', 'string', 'max:1000'],
+            'gender'          => ['nullable', 'in:male,female,other,unknown'],
+            'pusta'           => ['nullable', 'string', 'max:255'],
+            'birth_order'     => ['nullable', 'integer', 'min:1', 'max:' . SiblingOrder::MAX],
+            'death_date'      => ['nullable', 'date'],
+            'death_place'     => ['nullable', 'string', 'max:255'],
+            'death_tithi'     => ['nullable', 'string', 'max:50'],
+            'death_reason'    => ['nullable', 'string', 'max:255'],
+            // admin only (ignored for members below)
+            'member_type'     => ['nullable', \Illuminate\Validation\Rule::in(\App\Support\MemberType::all())],
+            'membership'      => ['nullable', 'string', 'max:100'],
+            'registered_by'   => ['nullable', 'string', 'max:100'],
         ]);
+        if (!Auth::user()->isAdmin()) {
+            unset($validated['member_type'], $validated['membership'], $validated['registered_by']);
+        }
         if (!empty($validated['display_name'])) {
             $validated = array_merge($validated, $this->namePartsFromDisplayName($validated['display_name']));
         }
@@ -233,9 +293,14 @@ class UserPersonChangeRequestController extends Controller
 
         // ── Admin: direct update ───────────────────────────────────────────────
         if (Auth::user()->isAdmin()) {
+            $birthOrder = (int) ($payload['birth_order'] ?? 0);
+            unset($payload['birth_order']);
             $person->update($payload);
+            if ($birthOrder && ($parent = SiblingOrder::parentFor($person))) {
+                SiblingOrder::assign($parent, $person, $birthOrder);
+            }
             return redirect()->route('member.page', $person->id)
-                ->with('success_message', $person->display_name . ' को प्रोफाइल सिधै अपडेट गरियो।');
+                ->with('success_message', $person->display_name . \App\Support\FrontendLocale::text(' को प्रोफाइल सिधै अपडेट गरियो।'));
         }
 
         // ── Member: change request ─────────────────────────────────────────────
@@ -254,7 +319,7 @@ class UserPersonChangeRequestController extends Controller
         $this->sendNotificationEmail($req, $person);
 
         return redirect()->route('member.page', ['person' => $person->id])
-            ->with('success_message', $person->display_name . ' को प्रोफाइल सम्पादन अनुरोध पठाइयो।');
+            ->with('success_message', $person->display_name . \App\Support\FrontendLocale::text(' को प्रोफाइल सम्पादन अनुरोध पठाइयो।'));
     }
 
     // ── Request Marriage ──────────────────────────────────────────────────────
@@ -273,10 +338,16 @@ class UserPersonChangeRequestController extends Controller
             'start_date'         => ['nullable', 'date'],
             'notes'              => ['nullable', 'string', 'max:1000'],
             'submitted_name'     => ['nullable', 'string', 'max:255'],
+            'return_to'          => ['nullable', 'in:back'],
+            ...SpouseDetails::rules(),
         ]);
+        // e.g. the relationships page opens this form and wants to come back to itself
+        $done = fn (string $msg) => ($validated['return_to'] ?? null) === 'back'
+            ? back()->with('success', $msg)->with('success_message', $msg)
+            : redirect()->route('member.page', $person->id)->with('success_message', $msg);
 
         if (empty($validated['spouse_person_id']) && empty($validated['spouse_name'])) {
-            return back()->withErrors(['spouse_name' => 'जीवनसाथीको नाम वा ID अनिवार्य छ।'])
+            return back()->withErrors(['spouse_name' => \App\Support\FrontendLocale::text('जीवनसाथीको नाम वा ID अनिवार्य छ।')])
                 ->withInput()->with('open_modal', 'marriage');
         }
 
@@ -285,11 +356,11 @@ class UserPersonChangeRequestController extends Controller
         if (Auth::user()->isAdmin()) {
             $incomingSpouseId = $validated['spouse_person_id'] ?? null;
             if ($incomingSpouseId && (int) $incomingSpouseId === (int) $person->id) {
-                return back()->withErrors(['spouse_person_id' => 'आफैंलाई जीवनसाथी बनाउन मिल्दैन।'])
+                return back()->withErrors(['spouse_person_id' => \App\Support\FrontendLocale::text('आफैंलाई जीवनसाथी बनाउन मिल्दैन।')])
                     ->withInput()->with('open_modal', 'marriage');
             }
 
-            DB::transaction(function () use ($validated, $person) {
+            DB::transaction(function () use ($validated, $person, $request) {
                 $spouseId = $validated['spouse_person_id'] ?? null;
 
                 if (!$spouseId) {
@@ -301,6 +372,11 @@ class UserPersonChangeRequestController extends Controller
                         $validated['spouse_name_np']    ?? null,
                         $validated['spouse_name_limbu'] ?? null
                     );
+                    $details = SpouseDetails::fromInput($validated);
+                    if ($request->hasFile('spouse_photo')) {
+                        $details['spouse_photo_path'] = SpouseDetails::storePhoto($request->file('spouse_photo'));
+                    }
+                    SpouseDetails::apply($spouse, $details);
                     $spouseId = $spouse->id;
                 }
 
@@ -321,8 +397,7 @@ class UserPersonChangeRequestController extends Controller
                 }
             });
 
-            return redirect()->route('member.page', $person->id)
-                ->with('success_message', $person->display_name . ' को विवाह जानकारी सिधै थपियो।');
+            return $done($person->display_name . \App\Support\FrontendLocale::text(' को विवाह जानकारी सिधै थपियो।'));
         }
 
         // ── Member: change request ─────────────────────────────────────────────
@@ -342,6 +417,9 @@ class UserPersonChangeRequestController extends Controller
                 'type'              => $validated['type']              ?? 'married',
                 'start_date'        => $validated['start_date']        ?? null,
                 'notes'             => $validated['notes']             ?? null,
+                // new-spouse details (photo waits in photos/requests until approved)
+                ...(empty($validated['spouse_person_id']) ? SpouseDetails::fromInput($validated + ($request->hasFile('spouse_photo')
+                    ? ['spouse_photo_path' => $this->storeRequestPhoto($request->file('spouse_photo'), 'spouse')] : [])) : []),
             ],
             'submitted_name'  => $submittedName,
             'submitted_email' => Auth::user()->email,
@@ -349,8 +427,7 @@ class UserPersonChangeRequestController extends Controller
 
         $this->sendNotificationEmail($req, $person);
 
-        return redirect()->route('member.page', ['person' => $person->id])
-            ->with('success_message', $person->display_name . ' को विवाह जानकारी अनुरोध पठाइयो।');
+        return $done($person->display_name . \App\Support\FrontendLocale::text(' को विवाह जानकारी अनुरोध पठाइयो।'));
     }
 
     // ── Not Listed ────────────────────────────────────────────────────────────
@@ -385,7 +462,7 @@ class UserPersonChangeRequestController extends Controller
 
         $this->sendNotificationEmail($req, null);
 
-        return back()->with('success_message', 'तपाईंको अनुरोध पठाइयो। Admin ले समीक्षा गर्नेछन्।');
+        return back()->with('success_message', \App\Support\FrontendLocale::text('तपाईंको अनुरोध पठाइयो। Admin ले समीक्षा गर्नेछन्।'));
     }
 
     // ── My Requests ───────────────────────────────────────────────────────────
@@ -395,7 +472,7 @@ class UserPersonChangeRequestController extends Controller
         $requests = PersonChangeRequest::with('person:id,display_name')
             ->where('user_id', Auth::id())
             ->latest()
-            ->paginate(15);
+            ->paginate(15)->appends(['lang' => \App\Support\FrontendLocale::locale()]);
 
         return view('requests.my-requests', compact('requests'));
     }
@@ -424,6 +501,7 @@ class UserPersonChangeRequestController extends Controller
             'update_profile' => 'प्रोफाइल सम्पादन',
             'add_union'      => 'विवाह जानकारी',
             'not_listed'     => 'सूचीमा नभएको',
+            'link_parent'    => 'अभिभावक जोड्ने',
         ];
         $typeLabel  = $typeLabels[$req->type] ?? $req->type;
         $subject    = '[Menyanbo] नयाँ अनुरोध: ' . $typeLabel . ' — #' . str_pad($req->id, 5, '0', STR_PAD_LEFT);

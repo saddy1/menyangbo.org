@@ -1,5 +1,5 @@
 @extends('layouts.app')
-@section('title', $notice->title . ' — सूचना')
+@section('title', $notice->title . \App\Support\FrontendLocale::text(' — सूचना'))
 @section('meta_description', Str::limit(strip_tags($notice->body ?: $notice->title), 150))
 
 @section('content')
@@ -14,7 +14,7 @@
     <div class="px-4 py-4 sm:px-6 flex flex-wrap items-start justify-between gap-3 border-b border-slate-100">
         <div>
             <div class="flex flex-wrap items-center gap-2 text-xs mb-2">
-                <a href="{{ route('notices.public') }}" class="font-semibold text-blue-600 hover:underline">सूचनाहरू</a>
+                <a href="{{ \App\Support\FrontendLocale::route('notices.public') }}" class="font-semibold text-blue-600 hover:underline">{{ \App\Support\FrontendLocale::text('सूचनाहरू') }}</a>
                 <span class="text-slate-300">/</span>
                 <span class="rounded-full bg-amber-50 px-2.5 py-1 font-bold text-amber-700">{{ $notice->display_date_time }}</span>
             </div>
@@ -25,7 +25,7 @@
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
             </svg>
-            New Tab मा खोल्नुहोस्
+            {{ \App\Support\FrontendLocale::text('New Tab मा खोल्नुहोस्') }}
         </a>
     </div>
 
@@ -34,10 +34,10 @@
             style="width:100%; height:100vh; min-height:600px; border:none; display:block;"
             title="{{ $notice->attachment_name }}">
         <div class="p-8 text-center">
-            <p class="text-slate-600 mb-4">तपाईंको ब्राउजरले PDF देखाउन सक्दैन।</p>
+            <p class="text-slate-600 mb-4">{{ \App\Support\FrontendLocale::text('तपाईंको ब्राउजरले PDF देखाउन सक्दैन।') }}</p>
             <a href="{{ $notice->attachment_url }}" target="_blank" rel="noopener"
                class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 text-white font-semibold text-sm">
-                PDF खोल्नुहोस्
+                {{ \App\Support\FrontendLocale::text('PDF खोल्नुहोस्') }}
             </a>
         </div>
     </iframe>
@@ -54,7 +54,7 @@
     <div class="px-4 sm:px-6 pb-5">
         <a href="{{ $notice->link }}" target="_blank" rel="noopener"
            class="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700">
-            {{ $notice->link_text ?? 'थप जानकारी हेर्नुहोस्' }}
+            {{ $notice->link_text ?? \App\Support\FrontendLocale::text('थप जानकारी हेर्नुहोस्') }}
             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
             </svg>
@@ -72,7 +72,7 @@
 
         <div class="px-4 py-4 sm:px-6 sm:py-5">
             <div class="mb-3 flex flex-wrap items-center gap-2 text-xs">
-                <a href="{{ route('notices.public') }}" class="font-semibold text-blue-600 hover:underline">सूचनाहरू</a>
+                <a href="{{ \App\Support\FrontendLocale::route('notices.public') }}" class="font-semibold text-blue-600 hover:underline">{{ \App\Support\FrontendLocale::text('सूचनाहरू') }}</a>
                 <span class="text-slate-300">/</span>
                 <span class="rounded-full bg-amber-50 px-2.5 py-1 font-bold text-amber-700">
                     {{ $notice->display_date_time }}
@@ -94,7 +94,7 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0zm0 0l2 2"/>
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M8 11h6M11 8v6"/>
                                     </svg>
-                                    Zoom
+                                    {{ \App\Support\FrontendLocale::text('Zoom') }}
                                 </span>
                             </div>
                         </div>
@@ -133,7 +133,7 @@
                 <div class="mt-6">
                     <a href="{{ $notice->link }}" target="_blank" rel="noopener"
                        class="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700">
-                        {{ $notice->link_text ?? 'थप जानकारी हेर्नुहोस्' }}
+                        {{ $notice->link_text ?? \App\Support\FrontendLocale::text('थप जानकारी हेर्नुहोस्') }}
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
                         </svg>
@@ -144,14 +144,14 @@
     </article>
 
     <aside class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm h-fit">
-        <h2 class="mb-3 text-sm font-bold text-slate-800">अरू सूचनाहरू</h2>
+        <h2 class="mb-3 text-sm font-bold text-slate-800">{{ \App\Support\FrontendLocale::text('अरू सूचनाहरू') }}</h2>
         @forelse($moreNotices as $item)
-            <a href="{{ route('notices.show', $item) }}" class="block rounded-xl px-3 py-2 hover:bg-slate-50">
+            <a href="{{ \App\Support\FrontendLocale::route('notices.show', $item) }}" class="block rounded-xl px-3 py-2 hover:bg-slate-50">
                 <div class="text-[11px] font-bold text-amber-600">{{ $item->display_date_time }}</div>
                 <div class="mt-0.5 line-clamp-2 text-sm font-semibold text-slate-700">{{ $item->title }}</div>
             </a>
         @empty
-            <p class="text-sm text-slate-400">अरू सूचना छैन।</p>
+            <p class="text-sm text-slate-400">{{ \App\Support\FrontendLocale::text('अरू सूचना छैन।') }}</p>
         @endforelse
     </aside>
 </div>

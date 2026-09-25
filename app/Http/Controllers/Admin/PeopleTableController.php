@@ -14,7 +14,7 @@ class PeopleTableController extends Controller
 {
     public function index()
     {
-        return view('admin.members.index');
+        return view('members.index');
     }
 
     public function all(Request $request)

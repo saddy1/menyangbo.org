@@ -75,9 +75,7 @@ class GoogleController extends Controller
         Auth::login($user, true);
         $request->session()->regenerate();
 
-        $fallback = $user->isAdmin() ? route('admin.dashboard') : route('home');
-
-        return redirect()->intended($fallback);
+        return \App\Support\LoginRedirect::for($user);
     }
 
     private function isSafeReturnUrl(string $url): bool

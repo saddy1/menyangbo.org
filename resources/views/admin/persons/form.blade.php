@@ -7,6 +7,7 @@ $p = $person ?? null;
     SECTION HEADER MACRO
 ════════════════════════════════════════ --}}
 @php
+if (!function_exists('secHead')) { // the view can render more than once per process (tests, queues)
 function secHead(string $icon, string $title, string $color = 'blue'): string {
     return <<<HTML
 <div class="md:col-span-4 flex items-center gap-2 mt-2 mb-1">
@@ -15,6 +16,7 @@ function secHead(string $icon, string $title, string $color = 'blue'): string {
   <div class="flex-1 border-t border-slate-200"></div>
 </div>
 HTML;
+}
 }
 @endphp
 
@@ -35,9 +37,10 @@ HTML;
   </div>
 
   <div>
-    <label class="form-label">Full Name (English)</label>
+    <label class="form-label">Full Name (English) @unless($p)<span class="text-red-500">*</span>@endunless</label>
     <input type="text" name="display_name_np" class="form-input"
-      value="{{ old('display_name_np', $p->display_name_np ?? '') }}" placeholder="Full English name">
+      value="{{ old('display_name_np', $p->display_name_np ?? '') }}" placeholder="Full English name" @unless($p) required @endunless>
+    @error('display_name_np')<p class="form-error">{{ $message }}</p>@enderror
   </div>
 
   <div>
@@ -59,7 +62,7 @@ HTML;
     <label class="form-label">Gender <span class="text-red-500">*</span></label>
     <select name="gender" id="personGenderSelect" class="form-input">
       @foreach (['male' => 'Male ♂', 'female' => 'Female ♀', 'other' => 'Other', 'unknown' => 'Unknown'] as $k => $v)
-        <option value="{{ $k }}" @selected(old('gender', $p->gender ?? 'unknown') === $k)>{{ $v }}</option>
+        <option value="{{ $k }}" @selected(old('gender', $p ? ($p->gender ?? 'unknown') : 'male') === $k)>{{ $v }}</option>
       @endforeach
     </select>
     @error('gender')<p class="form-error">{{ $message }}</p>@enderror
@@ -87,8 +90,15 @@ HTML;
 
   <div>
     <label class="form-label">सदस्यको प्रकार</label>
-    <input type="text" name="member_type" class="form-input"
-      value="{{ old('member_type', $p->member_type ?? '') }}" placeholder="दाजु भाई">
+    @php $mt = old('member_type', $p ? ($p->member_type ?? '') : \App\Support\MemberType::forGender(old('gender', 'male'))); @endphp
+    <select name="member_type" id="personMemberType" class="form-input">
+      <option value="">—</option>
+      @foreach(\App\Support\MemberType::all() as $type)
+        <option value="{{ $type }}" @selected($mt === $type)>{{ $type }}</option>
+      @endforeach
+    </select>
+    <p class="text-[11px] text-slate-400 mt-1">पुरुष → दाजुभाइ · महिला → दिदीबहिनी · विवाह गरेर आएकी → बुहारी</p>
+    @error('member_type')<p class="form-error">{{ $message }}</p>@enderror
   </div>
 
   <div>
@@ -278,91 +288,136 @@ HTML;
     </div>
 
     {{-- Collapsible panel --}}
-    <div id="unionPanel" class="union-panel mt-3 border border-pink-200 rounded-2xl p-4 bg-pink-50/30" style="display:none">
-      <p class="text-xs text-slate-500 mb-3">
-        Search an existing spouse, or enter a new spouse name if they are not registered yet.
-      </p>
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+    <div id="unionPanel" class="union-panel mt-3 space-y-4 rounded-2xl border border-pink-200 bg-white p-4" style="display:none">
 
-        {{-- Spouse AJAX search --}}
-        <div class="md:col-span-2 relative">
-          <label class="form-label">Registered spouse search</label>
-          <div class="relative">
-            <input type="text" id="spouseSearchInput"
-              class="form-input pr-8" autocomplete="off"
-              placeholder="Type name in English or Nepali…">
-            <span id="spouseSearchSpinner"
-              class="hidden absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs">⏳</span>
+      {{-- 1. existing spouse --}}
+      <div class="relative">
+        <label class="form-label">🔍 प्रणालीमा भएको जीवनसाथी खोज्नुहोस्</label>
+        <div class="relative">
+          <input type="text" id="spouseSearchInput" class="form-input pr-8" autocomplete="off"
+            placeholder="नाम (नेपाली / English), ID वा सदस्य नं…">
+          <span id="spouseSearchSpinner" class="hidden absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs">⏳</span>
+        </div>
+        <input type="hidden" name="union_spouse_id" id="union_spouse_id" value="{{ old('union_spouse_id') }}">
+        <div id="spouseSelected" class="mt-1.5 items-center gap-2 px-3 py-2 bg-green-50 border border-green-300 rounded-lg text-sm text-green-800" style="display:none">
+          <span>✅</span>
+          <span id="spouseSelectedName"></span>
+          <button type="button" id="clearSpouseBtn" class="ml-auto text-xs text-red-500 hover:underline">Remove</button>
+        </div>
+        <div id="spouseDropdown" class="hidden absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-50 max-h-52 overflow-y-auto"></div>
+        @error('union_spouse_id')<p class="form-error">{{ $message }}</p>@enderror
+      </div>
+
+      <div class="flex items-center gap-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+        <span class="h-px flex-1 bg-slate-200"></span> वा नयाँ जीवनसाथी <span class="h-px flex-1 bg-slate-200"></span>
+      </div>
+
+      {{-- 2. new spouse: photo + details (disabled while an existing spouse is selected) --}}
+      <div id="newSpouseCard" class="rounded-xl border border-slate-200 bg-slate-50/50 p-3 sm:p-4">
+        <div class="flex flex-col sm:flex-row gap-4">
+          <div class="flex shrink-0 flex-col items-center gap-2 sm:w-36">
+            <div id="unionSpousePhotoPreview" class="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border-2 border-dashed border-slate-300 bg-white text-3xl text-slate-300">👤</div>
+            <div class="flex w-full flex-wrap items-start justify-center gap-x-1.5">
+              <label for="unionSpousePhoto" class="mt-1.5 inline-flex cursor-pointer items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50">🖼 फाइल</label>
+              <input type="file" name="spouse_photo" id="unionSpousePhoto" data-new-spouse data-camera data-camera-label="📷 क्यामेरा"
+                accept="image/jpeg,image/jpg,image/png,image/webp" class="sr-only">
+              <p class="mt-1 w-full text-center text-[10px] text-slate-400">Max 500 KB</p>
+            </div>
+            @error('spouse_photo')<p class="form-error text-center">{{ $message }}</p>@enderror
           </div>
-          <input type="hidden" name="union_spouse_id" id="union_spouse_id"
-            value="{{ old('union_spouse_id') }}">
 
-          {{-- Selected display --}}
-          <div id="spouseSelected"
-            class="mt-1.5 items-center gap-2 px-3 py-2 bg-green-50 border border-green-300 rounded-lg text-sm text-green-800"
-            style="display:none">
-            <span>✅</span>
-            <span id="spouseSelectedName"></span>
-            <button type="button" id="clearSpouseBtn" class="ml-auto text-xs text-red-500 hover:underline">Remove</button>
+          <div class="min-w-0 flex-1 space-y-3">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label class="form-label">नेपाली नाम <span class="text-red-500">*</span></label>
+                <input type="text" name="union_spouse_name" data-new-spouse class="form-input" value="{{ old('union_spouse_name') }}" placeholder="जीवनसाथीको नाम">
+                @error('union_spouse_name')<p class="form-error">{{ $message }}</p>@enderror
+              </div>
+              <div>
+                <label class="form-label">Full Name (English)</label>
+                <input type="text" name="union_spouse_name_np" data-new-spouse class="form-input" value="{{ old('union_spouse_name_np') }}" placeholder="English name">
+              </div>
+              <div>
+                <label class="form-label">Limbu name</label>
+                <input type="text" name="union_spouse_name_limbu" data-new-spouse class="form-input" value="{{ old('union_spouse_name_limbu') }}" placeholder="Limbu script">
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="form-label">लिङ्ग</label>
+                @php $defaultSpouseGender = old('union_spouse_gender', ($p->gender ?? old('gender', 'male')) === 'female' ? 'male' : 'female'); @endphp
+                <select name="union_spouse_gender" data-new-spouse class="form-input">
+                  @foreach(['female' => 'पत्नी (Female)', 'male' => 'पति (Male)', 'other' => 'Other', 'unknown' => 'Unknown'] as $k => $v)
+                    <option value="{{ $k }}" @selected($defaultSpouseGender === $k)>{{ $v }}</option>
+                  @endforeach
+                </select>
+              </div>
+              <div>
+                <label class="form-label">मोबाइल</label>
+                <input type="text" name="spouse_mobile" data-new-spouse inputmode="tel" class="form-input" value="{{ old('spouse_mobile') }}">
+              </div>
+            </div>
           </div>
+        </div>
 
-          {{-- Dropdown results --}}
-          <div id="spouseDropdown"
-            class="hidden absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-50 max-h-52 overflow-y-auto">
+        <div class="mt-4 grid grid-cols-2 md:grid-cols-3 gap-3">
+          <div>
+            <label class="form-label">जन्म मिति (A.D.)</label>
+            <input type="date" name="spouse_birth_date" data-new-spouse class="form-input" value="{{ old('spouse_birth_date') }}">
+            @error('spouse_birth_date')<p class="form-error">{{ $message }}</p>@enderror
+          </div>
+          <div>
+            <label class="form-label">जन्म मिति (B.S.)</label>
+            <input type="text" name="spouse_birth_date_bs" data-new-spouse class="form-input" value="{{ old('spouse_birth_date_bs') }}" placeholder="2055-04-12">
+          </div>
+          <div class="col-span-2 md:col-span-1">
+            <label class="form-label">माइती / जन्मस्थान</label>
+            <input type="text" name="spouse_birth_place" data-new-spouse class="form-input" value="{{ old('spouse_birth_place') }}">
+          </div>
+          <div>
+            <label class="form-label">बुबाको नाम</label>
+            <input type="text" name="spouse_father_name" data-new-spouse class="form-input" value="{{ old('spouse_father_name') }}">
+          </div>
+          <div>
+            <label class="form-label">आमाको नाम</label>
+            <input type="text" name="spouse_mother_name" data-new-spouse class="form-input" value="{{ old('spouse_mother_name') }}">
+          </div>
+          <div class="col-span-2 md:col-span-1">
+            <label class="form-label">हालको ठेगाना</label>
+            <input type="text" name="spouse_address" data-new-spouse class="form-input" value="{{ old('spouse_address') }}">
+          </div>
+          <div>
+            <label class="form-label">शिक्षा</label>
+            <input type="text" name="spouse_education" data-new-spouse class="form-input" value="{{ old('spouse_education') }}">
+          </div>
+          <div>
+            <label class="form-label">पेशा</label>
+            <input type="text" name="spouse_occupation" data-new-spouse class="form-input" value="{{ old('spouse_occupation') }}">
           </div>
         </div>
+      </div>
 
-        <div class="md:col-span-2">
-          <label class="form-label">New spouse full name (if not registered)</label>
-          <input type="text" name="union_spouse_name" class="form-input"
-            value="{{ old('union_spouse_name') }}"
-            placeholder="Full name of spouse">
-          @error('union_spouse_name')<p class="form-error">{{ $message }}</p>@enderror
+      {{-- 3. marriage details --}}
+      <div class="rounded-xl border border-pink-100 bg-pink-50/40 p-3 sm:p-4">
+        <div class="mb-2 text-[11px] font-bold uppercase tracking-wide text-pink-500">विवाह विवरण</div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div>
+            <label class="form-label">विवाह प्रकार</label>
+            <select name="union_type" class="form-input">
+              @foreach(['married' => '💍 Married','divorced' => '💔 Divorced','widowed' => '🕊️ Widowed','separated' => '🔗 Separated'] as $k => $v)
+                <option value="{{ $k }}" @selected(old('union_type','married') === $k)>{{ $v }}</option>
+              @endforeach
+            </select>
+          </div>
+          <div>
+            <label class="form-label">विवाह मिति (A.D.)</label>
+            <input type="date" name="union_start_date" class="form-input" value="{{ old('union_start_date') }}">
+          </div>
+          <div class="col-span-2">
+            <label class="form-label">Notes</label>
+            <input type="text" name="union_notes" class="form-input" value="{{ old('union_notes') }}" placeholder="थप नोट…">
+          </div>
         </div>
-
-        <div>
-          <label class="form-label">नयाँ जीवनसाथी नेपाली नाम</label>
-          <input type="text" name="union_spouse_name_np" class="form-input"
-            value="{{ old('union_spouse_name_np') }}" placeholder="नेपाली नाम">
-        </div>
-
-        <div>
-          <label class="form-label">Limbu name</label>
-          <input type="text" name="union_spouse_name_limbu" class="form-input"
-            value="{{ old('union_spouse_name_limbu') }}" placeholder="Limbu script name">
-        </div>
-
-        <div>
-          <label class="form-label">New spouse gender</label>
-          @php $defaultSpouseGender = old('union_spouse_gender', ($p->gender ?? '') === 'male' ? 'female' : (($p->gender ?? '') === 'female' ? 'male' : 'unknown')); @endphp
-          <select name="union_spouse_gender" class="form-input">
-            @foreach(['female' => 'Female / पत्नी', 'male' => 'Male / पति', 'other' => 'Other', 'unknown' => 'Unknown'] as $k => $v)
-              <option value="{{ $k }}" @selected($defaultSpouseGender === $k)>{{ $v }}</option>
-            @endforeach
-          </select>
-        </div>
-
-        <div>
-          <label class="form-label">विवाह मिति (A.D.)</label>
-          <input type="date" name="union_start_date" class="form-input"
-            value="{{ old('union_start_date') }}">
-        </div>
-
-        <div>
-          <label class="form-label">विवाह प्रकार</label>
-          <select name="union_type" class="form-input">
-            @foreach(['married' => '💍 Married','divorced' => '💔 Divorced','widowed' => '🕊️ Widowed','separated' => '🔗 Separated'] as $k => $v)
-              <option value="{{ $k }}" @selected(old('union_type','married') === $k)>{{ $v }}</option>
-            @endforeach
-          </select>
-        </div>
-
-        <div class="md:col-span-4">
-          <label class="form-label">Notes (optional)</label>
-          <input type="text" name="union_notes" class="form-input"
-            value="{{ old('union_notes') }}" placeholder="Any additional notes about this union…">
-        </div>
-
       </div>
     </div>
   </div>
@@ -487,7 +542,24 @@ HTML;
   const spouseSelName  = document.getElementById('spouseSelectedName');
   const clearSpouseBtn = document.getElementById('clearSpouseBtn');
   const spouseSpinner  = document.getElementById('spouseSearchSpinner');
-  const newSpouseInputs = Array.from(document.querySelectorAll('[name="union_spouse_name"], [name="union_spouse_name_np"], [name="union_spouse_name_limbu"]'));
+  const newSpouseInputs = Array.from(document.querySelectorAll('[data-new-spouse]'));
+
+  /* ── New spouse photo preview (file or camera) ── */
+  (() => {
+    const input = document.getElementById('unionSpousePhoto');
+    const preview = document.getElementById('unionSpousePhotoPreview');
+    if (!input || !preview) return;
+    const empty = preview.className;
+    input.addEventListener('change', () => {
+      const f = input.files?.[0];
+      if (!f || f.size > 500 * 1024) {
+        if (f) { alert('फोटो 500 KB भन्दा ठूलो छ।'); input.value = ''; }
+        preview.className = empty; preview.textContent = '👤'; return;
+      }
+      preview.className = 'h-24 w-24 overflow-hidden rounded-full border-2 border-pink-200 bg-white';
+      preview.innerHTML = `<img src="${URL.createObjectURL(f)}" alt="" class="h-full w-full object-cover">`;
+    });
+  })();
 
   let debTimer = null;
   const searchUrl = '{{ route("admin.persons.search") }}';
@@ -502,13 +574,16 @@ HTML;
     spouseSelected.style.display = 'flex';
     spouseDropdown.classList.add('hidden');
     spouseInput.value = '';
-    newSpouseInputs.forEach(input => input.value = '');
+    newSpouseInputs.forEach(input => { if (input.tagName !== 'SELECT') input.value = ''; });
+    document.getElementById('unionSpousePhoto')?.dispatchEvent(new Event('change'));
+    document.getElementById('newSpouseCard')?.classList.add('opacity-50');
   }
 
   function clearSpouse() {
     spouseHidden.value = '';
     spouseSelected.style.display = 'none';
     spouseInput.value = '';
+    document.getElementById('newSpouseCard')?.classList.remove('opacity-50');
   }
 
   clearSpouseBtn && clearSpouseBtn.addEventListener('click', clearSpouse);
@@ -607,27 +682,19 @@ HTML;
   const gender = document.getElementById('personGenderSelect');
   const select = document.getElementById('personBirthOrder');
   const taken = @json($takenOrders ?? []);
-  const WORDS = {
-    male:   ['जेठो', 'माहिलो', 'साहिलो', 'काहिलो', 'ठाहिलो'],
-    female: ['जेठी', 'माहिली', 'साहिली', 'काहिली', 'ठाहिली'],
-  };
   const RELATION = { male: 'छोरा', female: 'छोरी' };
   const np = n => String(n).replace(/[0-9]/g, d => '०१२३४५६७८९'[d]);
+  const MAX = {{ \App\Support\SiblingOrder::MAX }};
   let wanted = parseInt(select.dataset.current, 10) || null;
 
   function fill() {
     const g = gender.value;
     const used = taken[g] || {};
     const nums = Object.keys(used).map(Number).sort((a, b) => a - b);
-    const max = Math.max(10, (nums.length ? nums[nums.length - 1] : 0) + 1);
-    const free = [];
-    for (let n = 1; n <= max; n++) if (!(n in used)) free.push(n);
-
-    select.innerHTML = '<option value="">— परिवर्तन नगर्ने —</option>' + free.map(n => {
-      const w = (WORDS[g] || [])[n - 1];
-      return `<option value="${n}">${np(n)}${w ? ' — ' + w : ''}</option>`;
-    }).join('');
-    select.value = free.includes(wanted) ? String(wanted) : '';
+    let options = '<option value="">— परिवर्तन नगर्ने —</option>';
+    for (let n = 1; n <= MAX; n++) options += `<option value="${n}">${np(n)}</option>`;
+    select.innerHTML = options;
+    select.value = wanted ? String(wanted) : '';
 
     document.getElementById('personOrderRelation').textContent = RELATION[g] || 'सन्तान';
     document.getElementById('personOrderTaken').textContent = nums.length
@@ -641,5 +708,20 @@ HTML;
 })();
 </script>
 @endif
+
+<script>
+// सदस्यको प्रकार follows gender while it still holds the automatic value (बुहारी / manual picks are kept)
+(() => {
+  const gender = document.querySelector('#personFormGrid [name="gender"]');
+  const type = document.getElementById('personMemberType');
+  if (!gender || !type) return;
+  const AUTO = { male: @js(\App\Support\MemberType::DAJU_BHAI), female: @js(\App\Support\MemberType::DIDI_BAHINI) };
+  let prev = gender.value;
+  gender.addEventListener('change', () => {
+    if (!type.value || type.value === (AUTO[prev] || '')) type.value = AUTO[gender.value] || '';
+    prev = gender.value;
+  });
+})();
+</script>
 
 @include('partials.photo-camera')

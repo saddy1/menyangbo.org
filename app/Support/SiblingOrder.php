@@ -28,7 +28,7 @@ class SiblingOrder
         return $siblings->filter(fn ($s) => ($s->gender ?: 'unknown') === $gender)->values();
     }
 
-    /** [rank => sibling name] for places already held by the parent's other children of this gender. */
+    /** [rank => sibling names] of the parent's other children of this gender (shown as a hint). */
     public static function taken(Person $parent, ?string $gender, ?int $exceptId = null): array
     {
         $siblings = self::sameGender(self::siblings($parent, $exceptId), $gender);
@@ -36,29 +36,23 @@ class SiblingOrder
 
         $out = [];
         foreach ($siblings as $s) {
-            $out[$ranks[$s->id]['rank']] = $s->display_name;
+            $r = $ranks[$s->id]['rank'];
+            $out[$r] = isset($out[$r]) ? $out[$r] . ', ' . $s->display_name : $s->display_name;
         }
         ksort($out);
 
         return $out;
     }
 
-    /** Free places as select options: [['value' => 2, 'label' => '२ — माहिलो'], …]. */
-    public static function options(?string $gender, array $taken): array
+    public const MAX = 10;
+
+    /** Dropdown choices १ … १० (any number may be chosen, even one a sibling already has). */
+    public static function options(): array
     {
-        $max = max(10, ($taken ? max(array_keys($taken)) : 0) + 1);
-
-        $options = [];
-        foreach (range(1, $max) as $n) {
-            if (isset($taken[$n])) continue;
-            $word = BirthOrder::placeWord($gender, $n);
-            $options[] = ['value' => $n, 'label' => BirthOrder::npDigits($n) . ($word ? " — {$word}" : '')];
-        }
-
-        return $options;
+        return array_map(fn ($n) => ['value' => $n, 'label' => BirthOrder::npDigits($n)], range(1, self::MAX));
     }
 
-    /** Taken places for both genders, for forms where the gender is chosen on the page. */
+    /** Existing places for every gender, for forms where the gender is chosen on the page. */
     public static function takenByGender(Person $parent, ?int $exceptId = null): array
     {
         return collect(['male', 'female', 'unknown', 'other'])
@@ -67,20 +61,13 @@ class SiblingOrder
     }
 
     /**
-     * Save $order as $child's place under $parent. Returns an error message when the place
-     * belongs to another sibling. The other same-gender siblings' current places are saved
-     * too, so the order no longer shifts with birth dates.
+     * Save $order as $child's place under $parent. The other same-gender siblings'
+     * current places are saved too, so the order no longer shifts with birth dates.
      */
-    public static function assign(Person $parent, Person $child, int $order): ?string
+    public static function assign(Person $parent, Person $child, int $order): void
     {
         $siblings = self::sameGender(self::siblings($parent, $child->id), $child->gender);
         $ranks = BirthOrder::rank($siblings);
-
-        foreach ($siblings as $s) {
-            if ($ranks[$s->id]['rank'] === $order) {
-                return "यो क्रम ({$ranks[$s->id]['label']}) पहिले नै {$s->display_name} को हो। अर्को छान्नुहोस्।";
-            }
-        }
 
         foreach ($siblings as $s) {
             if (!$s->birth_order) {
@@ -88,8 +75,6 @@ class SiblingOrder
             }
         }
         $child->update(['birth_order' => $order]);
-
-        return null;
     }
 
     /** Parent whose children decide this person's place: father first, else mother, else any. */

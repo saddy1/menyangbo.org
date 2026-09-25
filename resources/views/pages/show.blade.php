@@ -1,6 +1,6 @@
 @extends('layouts.app')
-@section('title', $page->meta_title ?? $page->title)
-@section('meta_description', $page->meta_description ?? '')
+@section('title', $page->meta_title ?: $page->title)
+@section('meta_description', $page->meta_description ?: \App\Support\Seo::description($page->content ?: $page->title))
 
 @section('content')
 <div class="max-w-3xl mx-auto">
@@ -14,7 +14,7 @@
     </div>
   @else
     <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 text-center text-slate-400">
-      सामग्री उपलब्ध छैन।
+      {{ \App\Support\FrontendLocale::text('सामग्री उपलब्ध छैन।') }}
     </div>
   @endif
 </div>

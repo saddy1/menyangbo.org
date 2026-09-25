@@ -1,85 +1,67 @@
 @extends('layouts.app')
-
-@section('title', 'पात्रो')
-@section('meta_description', 'नेपाली र अंग्रेजी मिति र समय')
-
+@section('title', \App\Support\FrontendLocale::text('पात्रो'))
+@section('meta_description', \App\Support\FrontendLocale::text('नेपाली र अंग्रेजी मिति र समय'))
 @section('content')
-@php
-    $weekdays = ['आइत', 'सोम', 'मंगल', 'बुध', 'बिही', 'शुक्र', 'शनि'];
-@endphp
-
-<div class="grid gap-6 lg:grid-cols-[360px_1fr]">
-    <aside class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <p class="text-xs font-bold uppercase tracking-widest text-blue-600 mb-2">Today</p>
-        <h1 class="text-2xl font-extrabold text-slate-900">{{ $today['weekday'] }}</h1>
-
-        <div class="mt-5 rounded-2xl bg-blue-700 p-5 text-white">
-            <div class="text-sm text-blue-100">नेपाली मिति</div>
-            <div class="mt-1 text-3xl font-black">{{ $today['bs']['label'] }}</div>
-            <div class="mt-3 text-sm text-blue-100">{{ $today['ad']['label'] }} · {{ $today['ad']['time'] }}</div>
-        </div>
-
-        <div class="mt-4 rounded-xl border border-slate-200 p-4">
-            <div class="text-xs font-semibold text-slate-400">A.D. Date</div>
-            <div class="mt-1 font-bold text-slate-800">{{ $today['ad']['date'] }}</div>
-        </div>
-    </aside>
-
-    <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
-            <div>
-                <p class="text-xs font-bold uppercase tracking-widest text-blue-600 mb-1">Nepali Calendar</p>
-                <h2 class="text-xl font-extrabold text-slate-900">
-                    {{ \App\Support\NepaliCalendar::nepaliNumber($calendar['year']) }} {{ $calendar['month_name'] }}
-                </h2>
+@php $weekdays = ['आइत', 'सोम', 'मंगल', 'बुध', 'बिही', 'शुक्र', 'शनि']; @endphp
+<div class="themed-page calendar-page">
+    @include('partials.page-heading', [
+        'eyebrow' => __('Every day, connected'),
+        'title' => \App\Support\FrontendLocale::text('पात्रो'),
+        'description' => __('Explore Nepali dates alongside the Gregorian calendar.'),
+    ])
+    <div class="calendar-layout">
+        <aside class="calendar-sidebar">
+            <div class="calendar-today">
+                <span class="home-eyebrow">{{ \App\Support\FrontendLocale::text('Today') }}</span>
+                <h2>{{ \App\Support\FrontendLocale::text($today['weekday']) }}</h2>
+                <strong class="today-number">{{ \App\Support\FrontendLocale::number($today['bs']['day']) }}</strong>
+                <p>{{ \App\Support\FrontendLocale::text(\App\Support\NepaliCalendar::monthName($today['bs']['month'])) }} {{ \App\Support\FrontendLocale::number($today['bs']['year']) }}</p>
+                <div class="calendar-ad"><span>{{ \App\Support\FrontendLocale::text('A.D. Date') }}</span><strong>{{ $today['ad']['label'] }}</strong></div>
             </div>
-            <div class="flex items-center gap-2">
-                <a href="{{ route('calendar.index', $calendar['prev']) }}"
-                   class="rounded-xl border px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">← Previous</a>
-                <a href="{{ route('calendar.index') }}"
-                   class="rounded-xl bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700">Today</a>
-                <a href="{{ route('calendar.index', $calendar['next']) }}"
-                   class="rounded-xl border px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">Next →</a>
+            <p class="calendar-timezone">{{ __('Dates follow Nepal time.') }}</p>
+        </aside>
+        <section class="theme-panel calendar-panel" aria-labelledby="calendar-month">
+            <div class="calendar-toolbar">
+                <div><span class="home-eyebrow">{{ \App\Support\FrontendLocale::text('Nepali Calendar') }}</span><h2 id="calendar-month">{{ \App\Support\FrontendLocale::text($calendar['month_name']) }} <span>{{ \App\Support\FrontendLocale::number($calendar['year']) }}</span></h2></div>
+                <nav class="calendar-navigation" aria-label="{{ __('Calendar navigation') }}">
+                    <a href="{{ \App\Support\FrontendLocale::route('calendar.index', $calendar['prev']) }}" aria-label="{{ __('Previous month') }}" title="{{ __('Previous month') }}">←</a>
+                    <a class="calendar-today-link" href="{{ \App\Support\FrontendLocale::route('calendar.index') }}">{{ \App\Support\FrontendLocale::text('Today') }}</a>
+                    <a href="{{ \App\Support\FrontendLocale::route('calendar.index', $calendar['next']) }}" aria-label="{{ __('Next month') }}" title="{{ __('Next month') }}">→</a>
+                </nav>
             </div>
-        </div>
-
-        <form method="GET" action="{{ route('calendar.index') }}" class="mb-5 flex flex-wrap gap-2">
-            <select name="year" class="rounded-xl border border-slate-200 px-3 py-2 text-sm">
-                @foreach($years as $year)
-                    <option value="{{ $year }}" @selected($year === $calendar['year'])>{{ \App\Support\NepaliCalendar::nepaliNumber($year) }}</option>
-                @endforeach
-            </select>
-            <select name="month" class="rounded-xl border border-slate-200 px-3 py-2 text-sm">
-                @for($month = 1; $month <= 12; $month++)
-                    <option value="{{ $month }}" @selected($month === $calendar['month'])>{{ \App\Support\NepaliCalendar::monthName($month) }}</option>
-                @endfor
-            </select>
-            <button class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">Show</button>
-        </form>
-
-        <div class="grid grid-cols-7 overflow-hidden rounded-2xl border border-slate-200">
-            @foreach($weekdays as $day)
-                <div class="bg-slate-100 px-2 py-3 text-center text-xs font-bold text-slate-500">{{ $day }}</div>
-            @endforeach
-
-            @for($i = 0; $i < $calendar['first_weekday']; $i++)
-                <div class="min-h-20 border-t border-slate-100 bg-slate-50"></div>
-            @endfor
-
-            @for($day = 1; $day <= $calendar['days']; $day++)
-                @php $isToday = $calendar['today_day'] === $day; @endphp
-                <div class="min-h-20 border-t border-slate-100 p-2 {{ $isToday ? 'bg-blue-50 ring-2 ring-inset ring-blue-500' : 'bg-white' }}">
-                    <div class="flex items-start justify-between gap-1">
-                        <span class="grid h-8 w-8 place-items-center rounded-full text-sm font-black {{ $isToday ? 'bg-blue-600 text-white' : 'text-slate-800' }}">
-                            {{ \App\Support\NepaliCalendar::nepaliNumber($day) }}
-                        </span>
-                        @if($isToday)
-                            <span class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">आज</span>
-                        @endif
-                    </div>
+            <form method="GET" action="{{ \App\Support\FrontendLocale::route('calendar.index') }}" class="calendar-filter">
+                <input type="hidden" name="lang" value="{{ \App\Support\FrontendLocale::locale() }}">
+                <select aria-label="{{ __('Year') }}" name="year">
+                    @foreach($years as $year)<option value="{{ $year }}" @selected($year === $calendar['year'])>{{ \App\Support\FrontendLocale::number($year) }}</option>@endforeach
+                </select>
+                <select aria-label="{{ __('Month') }}" name="month">
+                    @for($month = 1; $month <= 12; $month++)<option value="{{ $month }}" @selected($month === $calendar['month'])>{{ \App\Support\FrontendLocale::text(\App\Support\NepaliCalendar::monthName($month)) }}</option>@endfor
+                </select>
+                <button type="submit" class="home-button home-button-primary">{{ \App\Support\FrontendLocale::text('Show') }} <span aria-hidden="true">→</span></button>
+            </form>
+            <div class="month-grid" role="table" aria-labelledby="calendar-month">
+                <div class="month-weekdays" role="row">
+                    @foreach($weekdays as $day)<div role="columnheader">{{ \App\Support\FrontendLocale::text($day) }}</div>@endforeach
                 </div>
-            @endfor
-        </div>
-    </section>
+                @for($row = 0; $row < (int) ceil(($calendar['first_weekday'] + $calendar['days']) / 7); $row++)
+                    <div class="month-week" role="row">
+                        @for($column = 0; $column < 7; $column++)
+                            @php
+                                $day = $row * 7 + $column - $calendar['first_weekday'] + 1;
+                                $valid = $day >= 1 && $day <= $calendar['days'];
+                                $isToday = $valid && $calendar['today_day'] === $day;
+                            @endphp
+                            <div role="cell" class="month-day {{ !$valid ? 'is-empty' : '' }} {{ $isToday ? 'is-today' : '' }}" @if($isToday) aria-current="date" @endif>
+                                @if($valid)
+                                    <span>{{ \App\Support\FrontendLocale::number($day) }}</span>
+                                    @if($isToday)<small>{{ \App\Support\FrontendLocale::text('आज') }}</small>@endif
+                                @endif
+                            </div>
+                        @endfor
+                    </div>
+                @endfor
+            </div>
+        </section>
+    </div>
 </div>
 @endsection

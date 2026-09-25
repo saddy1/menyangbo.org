@@ -41,18 +41,6 @@ class BirthOrder
         return $words[$rank - 1] ?? null;
     }
 
-    /** Plain place name without the कान्छो rule: 1 → जेठो, 2 → माहिलो … (null past ठाहिलो). */
-    public static function placeWord(?string $gender, int $n): ?string
-    {
-        $words = match ($gender) {
-            'male'   => self::SON_WORDS,
-            'female' => self::DAUGHTER_WORDS,
-            default  => [],
-        };
-
-        return $words[$n - 1] ?? null;
-    }
-
     /** e.g. ['rank' => 2, 'total' => 3, 'word' => 'माहिलो', 'label' => 'छोरा २ · माहिलो'] */
     public static function info(?string $gender, int $rank, int $total): array
     {
@@ -79,8 +67,8 @@ class BirthOrder
     }
 
     /**
-     * Rank siblings within their gender. A saved birth_order is used as-is;
-     * siblings without one fill the free numbers in birth-date order.
+     * Rank siblings within their gender. A saved birth_order is used as-is (two
+     * siblings may share one); siblings without one fill the free numbers in birth-date order.
      *
      * @param  iterable  $siblings  items with id, gender, birth_order, birth_date
      * @return array<int, array>    keyed by sibling id
@@ -99,7 +87,7 @@ class BirthOrder
             $used = [];
             foreach ($items as $s) {
                 $saved = (int) data_get($s, 'birth_order');
-                if ($saved > 0 && !isset($used[$saved])) {
+                if ($saved > 0) {
                     $ranks[(int) data_get($s, 'id')] = $saved;
                     $used[$saved] = true;
                 }

@@ -52,7 +52,7 @@ class PasswordResetController extends Controller
         );
 
         return $status === Password::PASSWORD_RESET
-            ? redirect()->route('login')->with('success', 'पासवर्ड सफलतापूर्वक परिवर्तन गरियो!')
+            ? redirect()->route('login')->with('success', __('पासवर्ड सफलतापूर्वक परिवर्तन गरियो!'))
             : back()->withErrors(['email' => __($status)]);
     }
 }

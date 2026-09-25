@@ -59,8 +59,27 @@ public function memberPage(Person $person)
         'spouses'     => $spouses,
         'children'    => $children,
         'takenOrders' => \App\Support\SiblingOrder::takenByGender($person),
+        'selfOrder'   => $this->selfOrder($person),
+        // people who can't become this person's parent (self + descendants), only needed when none is linked
+        'blockedParentIds' => $person->parents->isEmpty() ? \App\Support\Lineage::descendantIds($person->id) : [],
     ]);
 }
+
+    /** This person's सन्तान क्रम under their parent, for the edit popup (null if no parent). */
+    private function selfOrder(Person $person): ?array
+    {
+        $parent = \App\Support\SiblingOrder::parentFor($person);
+        if (!$parent) return null;
+
+        $siblings = \App\Support\SiblingOrder::siblings($parent)
+            ->filter(fn ($s) => ($s->gender ?: 'unknown') === ($person->gender ?: 'unknown'));
+
+        return [
+            'parent'  => $parent->display_name,
+            'current' => BirthOrder::rank($siblings)[$person->id]['rank'] ?? null,
+            'others'  => \App\Support\SiblingOrder::taken($parent, $person->gender, $person->id),
+        ];
+    }
 
     private function tinyPerson(Person $person): array
     {

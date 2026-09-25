@@ -1,12 +1,14 @@
 {{-- resources/views/tree/index.blade.php --}}
 @extends('layouts.app')
-@section('title', 'परिवार वृक्ष')
+@section('title', \App\Support\FrontendLocale::text('परिवार वृक्ष'))
+
+@section('meta_description', \App\Support\FrontendLocale::text('मेन्याङ्बो वंशको परिवार वृक्षमा पुस्ता र पारिवारिक सम्बन्धहरू हेर्नुहोस्।'))
 
 @section('content')
   @if (!$root)
     <div class="p-6 bg-white rounded-xl border text-center">
-      <div class="text-lg font-semibold mb-2">कुनै डाटा भेटिएन</div>
-      <div class="text-slate-600">कृपया seeder चलाउनुहोस् वा नयाँ व्यक्ति थप्नुहोस्।</div>
+      <div class="text-lg font-semibold mb-2">{{ \App\Support\FrontendLocale::text('कुनै डाटा भेटिएन') }}</div>
+      <div class="text-slate-600">{{ \App\Support\FrontendLocale::text('कृपया seeder चलाउनुहोस् वा नयाँ व्यक्ति थप्नुहोस्।') }}</div>
     </div>
     @php return; @endphp
   @endif
@@ -18,9 +20,9 @@
   >
     <!-- Heading -->
     <div>
-      <h2 class="text-xl sm:text-2xl font-semibold">थिन्दोलुङ खोॽयाहाङ मेन्याङबो वंशावली</h2>
+      <h2 class="text-xl sm:text-2xl font-semibold">{{ \App\Support\FrontendLocale::text('थिन्दोलुङ खोॽयाहाङ मेन्याङबो वंशावली') }}</h2>
       <div class="text-sm sm:text-base mt-1">
-        हालको जरा:
+        {{ \App\Support\FrontendLocale::text('हालको जरा:') }}
         <span class="text-emerald-600 font-medium" x-text="currentRootName || '{{ $root->display_name }}'"></span>
       </div>
     </div>
@@ -31,11 +33,11 @@
 
         <!-- Pusta -->
         <div>
-          <label class="block text-xs text-slate-600 mb-1">पुस्ता (ने/अं)</label>
+          <label class="block text-xs text-slate-600 mb-1">{{ \App\Support\FrontendLocale::text('पुस्ता (ने/अं)') }}</label>
           <input
             x-ref="pustaInput"
             type="text"
-            placeholder="उदा: ५ / 5"
+            placeholder="{{ \App\Support\FrontendLocale::text('उदा: ५ / 5') }}"
             class="w-full rounded-lg border px-3 py-2 text-sm"
             @keyup.enter="loadPeopleByPusta()"
           >
@@ -43,7 +45,7 @@
 
         <!-- Realtime name search -->
         <div>
-          <label class="block text-xs text-slate-600 mb-1">Search name (AJAX)</label>
+          <label class="block text-xs text-slate-600 mb-1">{{ \App\Support\FrontendLocale::text('Search name (AJAX)') }}</label>
           <input
             type="text"
             class="w-full rounded-lg border px-3 py-2 text-sm"
@@ -54,7 +56,7 @@
 
         <!-- Root select -->
         <div class="sm:col-span-2">
-          <label class="block text-xs text-slate-600 mb-1">जरा परिवर्तन:</label>
+          <label class="block text-xs text-slate-600 mb-1">{{ \App\Support\FrontendLocale::text('जरा परिवर्तन:') }}</label>
           <div class="flex gap-2 flex-wrap">
             <select x-ref="rootSel" class="border rounded-lg px-3 py-2 grow min-w-[240px]">
               @foreach ($allPeople as $p)
@@ -65,17 +67,17 @@
             </select>
 
             <button class="px-4 py-2 rounded-lg bg-slate-700 text-white text-sm" @click="loadPeopleByPusta()">
-              सूची देखाउने
+              {{ \App\Support\FrontendLocale::text('सूची देखाउने') }}
             </button>
 
             <button class="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm" @click="drawFromSelect()">
-              हेर्नुहोस्
+              {{ \App\Support\FrontendLocale::text('हेर्नुहोस्') }}
             </button>
           </div>
 
           <!-- status -->
           <div class="mt-2 text-xs">
-            <span x-show="loading" class="text-slate-500" x-cloak>खोज्दै…</span>
+            <span x-show="loading" class="text-slate-500" x-cloak>{{ \App\Support\FrontendLocale::text('खोज्दै…') }}</span>
             <span x-show="error" class="text-rose-600" x-text="error" x-cloak></span>
             <span x-show="!loading && info" class="text-slate-500" x-text="info" x-cloak></span>
           </div>
@@ -85,30 +87,30 @@
 
     <!-- Control row -->
     <div class="flex items-center gap-2 overflow-x-auto no-scrollbar -mx-1 px-1">
-      <button class="shrink-0 px-3 py-1.5 rounded-lg border hover:bg-slate-50 text-sm" @click="zoomIn()">＋ Zoom In</button>
-      <button class="shrink-0 px-3 py-1.5 rounded-lg border hover:bg-slate-50 text-sm" @click="zoomOut()">－ Zoom Out</button>
-      <button class="shrink-0 px-3 py-1.5 rounded-lg border hover:bg-slate-50 text-sm" @click="fitToScreen()">Fit</button>
+      <button class="shrink-0 px-3 py-1.5 rounded-lg border hover:bg-slate-50 text-sm" @click="zoomIn()">{{ \App\Support\FrontendLocale::text('＋ Zoom In') }}</button>
+      <button class="shrink-0 px-3 py-1.5 rounded-lg border hover:bg-slate-50 text-sm" @click="zoomOut()">{{ \App\Support\FrontendLocale::text('－ Zoom Out') }}</button>
+      <button class="shrink-0 px-3 py-1.5 rounded-lg border hover:bg-slate-50 text-sm" @click="fitToScreen()">{{ \App\Support\FrontendLocale::text('Fit') }}</button>
 
       <button class="shrink-0 px-3 py-1.5 rounded-lg border hover:bg-slate-50 text-sm" @click="pan(0,-140)">↑</button>
       <button class="shrink-0 px-3 py-1.5 rounded-lg border hover:bg-slate-50 text-sm" @click="pan(-140,0)">←</button>
       <button class="shrink-0 px-3 py-1.5 rounded-lg border hover:bg-slate-50 text-sm" @click="pan(140,0)">→</button>
       <button class="shrink-0 px-3 py-1.5 rounded-lg border hover:bg-slate-50 text-sm" @click="pan(0,140)">↓</button>
 
-      <button class="shrink-0 px-3 py-1.5 rounded-lg border hover:bg-slate-50 text-sm" @click="prevPusta()">← Prev पुस्ता</button>
-      <button class="shrink-0 px-3 py-1.5 rounded-lg border hover:bg-slate-50 text-sm" @click="nextPusta()">Next पुस्ता →</button>
+      <button class="shrink-0 px-3 py-1.5 rounded-lg border hover:bg-slate-50 text-sm" @click="prevPusta()">{{ \App\Support\FrontendLocale::text('← Prev पुस्ता') }}</button>
+      <button class="shrink-0 px-3 py-1.5 rounded-lg border hover:bg-slate-50 text-sm" @click="nextPusta()">{{ \App\Support\FrontendLocale::text('Next पुस्ता →') }}</button>
 
       <div class="ml-auto text-xs text-slate-600 flex items-center gap-3 sm:gap-4">
         <span class="inline-flex items-center gap-1 shrink-0">
-          <span class="w-3 h-3 rounded-full" style="background:#2563eb"></span> पुरुष
+          <span class="w-3 h-3 rounded-full" style="background:#2563eb"></span> {{ \App\Support\FrontendLocale::text('पुरुष') }}
         </span>
         <span class="inline-flex items-center gap-1 shrink-0">
-          <span class="w-3 h-3 rounded-full" style="background:#db2777"></span> महिला
+          <span class="w-3 h-3 rounded-full" style="background:#db2777"></span> {{ \App\Support\FrontendLocale::text('महिला') }}
         </span>
         <span class="inline-flex items-center gap-1 shrink-0">
-          <span class="w-3 h-3 rounded-full" style="background:#7c3aed"></span> अन्य/अज्ञात
+          <span class="w-3 h-3 rounded-full" style="background:#7c3aed"></span> {{ \App\Support\FrontendLocale::text('अन्य/अज्ञात') }}
         </span>
         <span class="inline-flex items-center gap-1 shrink-0">
-          <span class="w-3 h-3 rounded-full border-2 border-rose-500"></span> स्वर्गीय
+          <span class="w-3 h-3 rounded-full border-2 border-rose-500"></span> {{ \App\Support\FrontendLocale::text('स्वर्गीय') }}
         </span>
       </div>
     </div>
@@ -139,7 +141,7 @@
         x-transition:leave-end="translate-x-full opacity-0"
       >
         <div class="flex items-center justify-between mb-4">
-          <h3 class="text-lg font-semibold">व्यक्ति विवरण</h3>
+          <h3 class="text-lg font-semibold">{{ \App\Support\FrontendLocale::text('व्यक्ति विवरण') }}</h3>
           <button class="text-slate-500 hover:text-slate-700" @click="open=false">✕</button>
         </div>
 
@@ -161,16 +163,16 @@
                 <div class="grid grid-cols-2 gap-4">
                   <div class="text-slate-600 text-sm">
                     <div class="mb-1">
-                      <span class="font-medium text-slate-700">जन्म:</span>
+                      <span class="font-medium text-slate-700">{{ \App\Support\FrontendLocale::text('जन्म:') }}</span>
                       <span x-text="dateNE(person.birth_date)"></span>
                     </div>
                     <div>
-                      <span class="font-medium text-slate-700">मृत्यु:</span>
+                      <span class="font-medium text-slate-700">{{ \App\Support\FrontendLocale::text('मृत्यु:') }}</span>
                       <span x-text="person.is_deceased ? dateNE(person.death_date) : '—'"></span>
                     </div>
                   </div>
                   <div class="text-right text-slate-600 text-sm">
-                    <div class="font-semibold mb-1">पुस्ता</div>
+                    <div class="font-semibold mb-1">{{ \App\Support\FrontendLocale::text('पुस्ता') }}</div>
                     <div class="text-lg font-bold text-slate-800" x-text="person.pusta || '—'"></div>
                   </div>
                 </div>
@@ -178,12 +180,12 @@
             </div>
 
             <div>
-              <div class="text-sm font-semibold mb-1">जीवनी</div>
+              <div class="text-sm font-semibold mb-1">{{ \App\Support\FrontendLocale::text('जीवनी') }}</div>
               <div class="text-sm text-slate-700" x-text="person.bio || '—'"></div>
             </div>
 
             <div>
-              <div class="text-sm font-semibold mb-1">अभिभावक</div>
+              <div class="text-sm font-semibold mb-1">{{ \App\Support\FrontendLocale::text('अभिभावक') }}</div>
               <ul class="list-disc ml-5 text-sm">
                 <template x-for="pp in (person.parents || [])" :key="pp.id">
                   <li>
@@ -194,7 +196,7 @@
             </div>
 
             <div>
-              <div class="text-sm font-semibold mb-1">सन्तान</div>
+              <div class="text-sm font-semibold mb-1">{{ \App\Support\FrontendLocale::text('सन्तान') }}</div>
               <ul class="list-disc ml-5 text-sm">
                 <template x-for="cc in (person.children || [])" :key="cc.id">
                   <li>
@@ -311,7 +313,7 @@
               }
               try{
                 this.error = '';
-                const url = new URL(@json(route('people.search')), window.location.origin);
+                const url = new URL(@json(\App\Support\FrontendLocale::route('people.search')), window.location.origin);
                 url.searchParams.set('term', t);
 
                 const r = await fetch(url);
@@ -332,9 +334,9 @@
                 }else{
                   const opt = document.createElement('option');
                   opt.value = '';
-                  opt.textContent = 'No results';
+                  opt.textContent = @js(\App\Support\FrontendLocale::text('No results'));
                   sel.appendChild(opt);
-                  this.info = 'No results';
+                  this.info = @js(\App\Support\FrontendLocale::text('No results'));
                 }
               }catch(e){
                 console.error(e);
@@ -355,12 +357,12 @@
 
           if(!pustaEN){
             this.loading=false;
-            this.error = 'पुस्ता भर्नुहोस् (उदा: ५ वा 5)';
+            this.error = @js(\App\Support\FrontendLocale::text('पुस्ता भर्नुहोस् (उदा: ५ वा 5)'));
             return;
           }
 
           try{
-            const url = new URL(@json(route('people.byPusta')), window.location.origin);
+            const url = new URL(@json(\App\Support\FrontendLocale::route('people.byPusta')), window.location.origin);
             url.searchParams.set('pusta', pustaEN);
 
             const r = await fetch(url);
@@ -377,17 +379,17 @@
                 opt.textContent = p.display_name || ('ID '+p.id);
                 sel.appendChild(opt);
               }
-              this.info = 'पुस्ता ' + toNE(pustaEN) + ' : '+ people.length + ' व्यक्ति भेटिए।';
+              this.info = @js(\App\Support\FrontendLocale::text('पुस्ता ')) + toNE(pustaEN) + ' : '+ people.length + @js(\App\Support\FrontendLocale::text(' व्यक्ति भेटिए।'));
             }else{
               const opt = document.createElement('option');
               opt.value = '';
-              opt.textContent = 'व्यक्ति भेटिएन';
+              opt.textContent = @js(\App\Support\FrontendLocale::text('व्यक्ति भेटिएन'));
               sel.appendChild(opt);
-              this.info = 'पुस्ता ' + toNE(pustaEN) + ' : व्यक्ति भेटिएन।';
+              this.info = @js(\App\Support\FrontendLocale::text('पुस्ता ')) + toNE(pustaEN) + @js(\App\Support\FrontendLocale::text(' : व्यक्ति भेटिएन।'));
             }
           }catch(e){
             console.error(e);
-            this.error = 'लोड गर्न सकिएन';
+            this.error = @js(\App\Support\FrontendLocale::text('लोड गर्न सकिएन'));
           }finally{
             this.loading=false;
           }
@@ -399,7 +401,7 @@
           const label = sel?.selectedOptions?.[0]?.textContent || null;
 
           if(!id){
-            this.error = 'कृपया सूचीबाट व्यक्ति छान्नुहोस्।';
+            this.error = @js(\App\Support\FrontendLocale::text('कृपया सूचीबाट व्यक्ति छान्नुहोस्।'));
             return;
           }
 
@@ -411,7 +413,7 @@
 
         async loadTree(rootId){
           try{
-            const url = new URL(@json(route('tree.json')), window.location.origin);
+            const url = new URL(@json(\App\Support\FrontendLocale::route('tree.json')), window.location.origin);
             url.searchParams.set('root_id', rootId);
 
             const res = await fetch(url);
@@ -425,7 +427,7 @@
             this.drawTree(rootData);
           }catch(e){
             console.error(e);
-            alert('ग्राफ लोड हुन सकेन।');
+            alert(@js(\App\Support\FrontendLocale::text('ग्राफ लोड हुन सकेन।')));
           }
         },
 
@@ -519,7 +521,7 @@
             .attr('font-size','10px')
             .attr('font-weight','700')
             .attr('fill','#ffffff')
-            .text(d => d.data.pusta ? 'पु.' + d.data.pusta : '')
+            .text(d => d.data.pusta ? @js(\App\Support\FrontendLocale::text('पु.')) + d.data.pusta : '')
             .attr('display', d => d.data.pusta ? null : 'none');
 
           // text background card
@@ -605,7 +607,7 @@
             this.open = true;
           }catch(e){
             console.error('person fetch failed', e);
-            alert('लोड हुन सकेन।');
+            alert(@js(\App\Support\FrontendLocale::text('लोड हुन सकेन।')));
           }
         }
       };

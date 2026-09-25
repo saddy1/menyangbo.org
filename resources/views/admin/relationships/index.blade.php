@@ -43,6 +43,13 @@
     </div>
   </form>
 
+  @if(!empty($prefill['child_id']) && empty($prefill['parent_id']) && !old('child_id'))
+    <div class="mb-3 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900">
+      <span>🔗</span>
+      <span><strong>{{ $prefill['child_id']['display_name'] }}</strong> सन्तानको रूपमा छानिएको छ — अब तल अभिभावक (बुबा/आमा) खोजेर छान्नुहोस्।</span>
+    </div>
+  @endif
+
   {{-- ✅ Add Relationship --}}
   <form method="POST" action="{{ route('admin.relationships.store') }}" id="relationshipAddForm"
         class="bg-white border border-slate-200 rounded-2xl shadow-sm mb-6">
@@ -105,7 +112,7 @@
       <div>
         <label class="text-xs font-semibold text-slate-600">Notes</label>
         <input type="text" name="notes" class="border border-slate-300 rounded-lg px-3 py-2 w-full bg-white"
-               value="{{ old('notes') }}" placeholder="Optional notes...">
+               value="{{ old('form_type') === 'marriage' ? '' : old('notes') }}" placeholder="Optional notes...">
         @error('notes') <div class="text-xs text-rose-600 mt-1">{{ $message }}</div> @enderror
       </div>
       <button id="relationshipAddBtn" disabled
@@ -149,6 +156,10 @@
                   @if($parent?->birth_date)<span>{{ $parent->birth_date->format('Y') }}</span>@endif
                 </div>
                 <div class="mt-1 text-[10px] text-slate-400">{{ $group->count() }} {{ $group->count() === 1 ? 'child' : 'children' }}</div>
+                <button type="button" data-edit-children="{{ $parentId }}"
+                  class="mt-2 inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700 hover:bg-blue-100">
+                  ✎ सम्पादन / क्रम
+                </button>
               </td>
 
               <td class="px-4 py-3">
@@ -191,10 +202,18 @@
       @forelse($grouped as $parentId => $group)
         @php $parent = $group->first()->parent; @endphp
         <div class="border-t p-4">
-          <div class="font-semibold text-slate-800">{{ $parent->display_name ?? '—' }}</div>
-          <div class="text-xs text-slate-400 mt-0.5">
-            {{ $parent?->member_no ? '#'.$parent->member_no : '' }}
-            {{ $parent?->pusta ? ' • पु.'.$parent->pusta : '' }}
+          <div class="flex items-start gap-2">
+            <div class="min-w-0 flex-1">
+              <div class="font-semibold text-slate-800">{{ $parent->display_name ?? '—' }}</div>
+              <div class="text-xs text-slate-400 mt-0.5">
+                {{ $parent?->member_no ? '#'.$parent->member_no : '' }}
+                {{ $parent?->pusta ? ' • पु.'.$parent->pusta : '' }}
+              </div>
+            </div>
+            <button type="button" data-edit-children="{{ $parentId }}"
+              class="shrink-0 inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700 hover:bg-blue-100">
+              ✎ सम्पादन
+            </button>
           </div>
           <div class="mt-3 flex flex-wrap gap-1.5">
             @foreach($group as $e)
@@ -228,7 +247,144 @@
 
 </div>
 
+{{-- Edit all children of one parent: order, gender, pusta, relation type --}}
+<div id="childrenEditor" class="fixed inset-0 z-50 hidden items-end sm:items-center justify-center bg-slate-900/40 p-0 sm:p-6" role="dialog" aria-modal="true">
+  <div class="flex max-h-[92vh] w-full sm:max-w-3xl flex-col overflow-hidden rounded-t-2xl sm:rounded-2xl border border-slate-200 bg-white shadow-2xl">
+    <div class="flex items-center gap-3 border-b border-slate-100 bg-slate-50/80 px-4 sm:px-5 py-3">
+      <div class="min-w-0">
+        <div class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">सन्तान सम्पादन</div>
+        <div class="truncate font-bold text-slate-900" data-ce="title">—</div>
+        <div class="text-[11px] text-slate-500" data-ce="meta"></div>
+      </div>
+      <button type="button" data-ce="close" class="ml-auto h-8 w-8 shrink-0 rounded-full text-lg leading-none text-slate-500 hover:bg-slate-200/60" aria-label="बन्द गर्नुहोस्">×</button>
+    </div>
+
+    <div class="flex-1 overflow-y-auto bg-white px-3 sm:px-5 py-4" data-ce="body">
+      <div class="py-8 text-center text-sm text-slate-400">Loading…</div>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-2 border-t border-slate-100 bg-slate-50/80 px-4 sm:px-5 py-3">
+      <span class="text-[11px] text-slate-500" data-ce="status">सन्तान क्रम १–१० मध्ये छान्नुहोस् · एउटै नम्बर दुई जनालाई पनि दिन मिल्छ।</span>
+      <button type="button" data-ce="close" class="ml-auto rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100">रद्द</button>
+      <button type="button" data-ce="save" class="rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">सेभ गर्नुहोस्</button>
+    </div>
+  </div>
+</div>
+
 <script>
+(() => {
+  const modal = document.getElementById('childrenEditor');
+  const $ = n => modal.querySelector(`[data-ce="${n}"]`);
+  const body = $('body'), saveBtn = $('save'), status = $('status');
+  const baseUrl = @json(url('/admin/relationships/parent'));
+  const csrf = @json(csrf_token());
+  const MAX = {{ \App\Support\SiblingOrder::MAX }};
+  const np = n => String(n ?? '').replace(/[0-9]/g, d => '०१२३४५६७८९'[d]);
+  const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+  const GROUPS = [
+    { key: 'male',   title: 'छोरा',  box: 'border-blue-100 bg-blue-50/40',   pill: 'bg-blue-100 text-blue-700' },
+    { key: 'female', title: 'छोरी',  box: 'border-pink-100 bg-pink-50/40',   pill: 'bg-pink-100 text-pink-700' },
+    { key: 'other',  title: 'अन्य', box: 'border-violet-100 bg-violet-50/40', pill: 'bg-violet-100 text-violet-700' },
+  ];
+  const groupOf = g => (g === 'male' || g === 'female') ? g : 'other';
+  let parentId = null, data = null;
+
+  const input = 'w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-800 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100';
+
+  function row(c) {
+    const orderOpts = '<option value="">—</option>' + Array.from({ length: MAX }, (_, i) => i + 1)
+      .map(n => `<option value="${n}" ${Number(c.birth_order || c.rank) === n ? 'selected' : ''}>${np(n)}</option>`).join('');
+    const sel = (name, opts, cur) => `<select data-f="${name}" class="${input}">${Object.entries(opts).map(([k, v]) => `<option value="${k}" ${cur === k ? 'selected' : ''}>${v}</option>`).join('')}</select>`;
+    return `<div data-child="${c.id}" class="grid grid-cols-[64px_1fr_auto] sm:grid-cols-[70px_minmax(0,1fr)_120px_80px_120px_auto] items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-2">
+      <label class="block"><span class="sr-only">सन्तान क्रम</span><select data-f="birth_order" class="${input} font-bold text-center">${orderOpts}</select></label>
+      <div class="min-w-0">
+        <div class="truncate text-sm font-semibold text-slate-800">${esc(c.display_name)}</div>
+        <div class="truncate text-[11px] text-slate-400">${esc(c.member_no || '#' + c.id)}${c.display_name_np ? ' · ' + esc(c.display_name_np) : ''}${c.spouses?.length ? ' · 💍 ' + esc(c.spouses.join(', ')) : ''}</div>
+      </div>
+      <button type="button" data-marry="${c.id}" title="विवाह थप्नुहोस्"
+        class="sm:order-last inline-flex h-8 items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2 text-xs font-semibold text-rose-700 hover:bg-rose-100">💍<span class="hidden md:inline">विवाह</span></button>
+      <div class="col-span-3 grid grid-cols-3 gap-2 sm:contents">
+        <label class="block"><span class="block text-[10px] font-semibold text-slate-400 sm:hidden">लिङ्ग</span>${sel('gender', { male: 'छोरा (M)', female: 'छोरी (F)', other: 'अन्य', unknown: 'थाहा छैन' }, c.gender)}</label>
+        <label class="block"><span class="block text-[10px] font-semibold text-slate-400 sm:hidden">पुस्ता</span><input data-f="pusta" value="${esc(c.pusta)}" placeholder="${esc(data.parent.next_pusta || '')}" class="${input}"></label>
+        <label class="block"><span class="block text-[10px] font-semibold text-slate-400 sm:hidden">सम्बन्ध</span>${sel('relation_type', { birth: 'Birth', adoption: 'Adoption', step: 'Step', guardianship: 'Guardianship' }, c.relation_type)}</label>
+      </div>
+    </div>`;
+  }
+
+  function render() {
+    $('title').textContent = data.parent.display_name;
+    $('meta').textContent = [data.parent.member_no, data.parent.pusta ? 'पु.' + data.parent.pusta : null, `${np(data.children.length)} सन्तान`].filter(Boolean).join(' · ');
+    if (!data.children.length) { body.innerHTML = '<div class="py-8 text-center text-sm text-slate-400">कुनै सन्तान छैन।</div>'; return; }
+
+    const head = `<div class="hidden sm:grid grid-cols-[70px_minmax(0,1fr)_120px_80px_120px_auto] gap-2 px-2.5 pb-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+      <span>क्रम</span><span>नाम</span><span>लिङ्ग</span><span>पुस्ता</span><span>सम्बन्ध</span><span class="w-8 md:w-[70px]"></span></div>`;
+    body.innerHTML = GROUPS.map(g => {
+      const kids = data.children.filter(c => groupOf(c.gender) === g.key);
+      if (!kids.length) return '';
+      return `<section class="mb-4 rounded-xl border ${g.box} p-2 sm:p-3">
+        <div class="mb-2 flex items-center gap-2"><span class="rounded-full px-2.5 py-0.5 text-xs font-bold ${g.pill}">${g.title} (${np(kids.length)})</span></div>
+        ${head}<div class="space-y-1.5">${kids.map(row).join('')}</div>
+      </section>`;
+    }).join('');
+  }
+
+  async function open(id) {
+    parentId = id;
+    data = null;
+    body.innerHTML = '<div class="py-8 text-center text-sm text-slate-400">Loading…</div>';
+    $('title').textContent = '…'; $('meta').textContent = '';
+    modal.classList.remove('hidden'); modal.classList.add('flex');
+    try {
+      const res = await fetch(`${baseUrl}/${id}/children`, { headers: { 'Accept': 'application/json' } });
+      data = await res.json();
+      render();
+    } catch (e) {
+      body.innerHTML = '<div class="py-8 text-center text-sm text-rose-500">लोड गर्न सकिएन।</div>';
+    }
+  }
+
+  function close() { modal.classList.add('hidden'); modal.classList.remove('flex'); }
+
+  async function save() {
+    if (!data) return;
+    const children = [...body.querySelectorAll('[data-child]')].map(el => {
+      const v = f => el.querySelector(`[data-f="${f}"]`).value;
+      return { id: +el.dataset.child, birth_order: v('birth_order') ? +v('birth_order') : null, gender: v('gender'), pusta: v('pusta'), relation_type: v('relation_type') };
+    });
+    saveBtn.disabled = true; saveBtn.textContent = 'सेभ हुँदैछ…';
+    try {
+      const res = await fetch(`${baseUrl}/${parentId}/children`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf },
+        body: JSON.stringify({ children }),
+      });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(out.message || 'सेभ गर्न सकिएन।');
+      data = out; render();
+      status.textContent = out.message; status.className = 'text-[11px] font-semibold text-green-700';
+      setTimeout(() => location.reload(), 700); // refresh the list so pusta / chips update
+    } catch (e) {
+      status.textContent = e.message; status.className = 'text-[11px] font-semibold text-rose-600';
+    } finally {
+      saveBtn.disabled = false; saveBtn.textContent = 'सेभ गर्नुहोस्';
+    }
+  }
+
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('[data-edit-children]');
+    if (btn) { e.preventDefault(); open(btn.dataset.editChildren); }
+    const marry = e.target.closest('[data-marry]');
+    if (marry && data) {
+      const c = data.children.find(x => String(x.id) === marry.dataset.marry);
+      if (c && window.openMarriageForm) window.openMarriageForm(c);
+    }
+  });
+  modal.querySelectorAll('[data-ce="close"]').forEach(b => b.addEventListener('click', close));
+  modal.addEventListener('click', e => { if (e.target === modal) close(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !modal.classList.contains('hidden')) close(); });
+  saveBtn.addEventListener('click', save);
+})();
+
 (() => {
   const searchUrl = @json(route('admin.persons.search'));
   const timers = new WeakMap();
@@ -395,6 +551,20 @@
       if (!box.parentElement.contains(e.target)) box.classList.add('hidden');
     });
   });
+
+  // Pre-selected people (?child_id=… from the tree page, or the last submitted form)
+  const prefill = @json($prefill ?? []);
+  for (const [target, person] of Object.entries(prefill)) {
+    const wrap = document.querySelector(`.person-search[data-person-picker="${target}"]`)?.closest('.relative');
+    if (wrap) { wrap.dataset.target = target; selectPerson(wrap, person); }
+  }
+  if (prefill.child_id && !prefill.parent_id) {
+    const form = document.getElementById('relationshipAddForm');
+    if (form) form.style.scrollMarginTop = '140px'; // keep the hint banner visible below the sticky header
+    form?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    form?.classList.add('ring-2', 'ring-amber-300');
+    setTimeout(() => document.querySelector('.person-search[data-person-picker="parent_id"]')?.focus({ preventScroll: true }), 400);
+  }
 })();
 
 (() => {
@@ -410,23 +580,12 @@
     return String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
   }
   const npDigits = n => String(n ?? '').replace(/[0-9]/g, d => '०१२३४५६७८९'[d]);
-  const WORDS = {
-    male:   ['जेठो', 'माहिलो', 'साहिलो', 'काहिलो', 'ठाहिलो'],
-    female: ['जेठी', 'माहिली', 'साहिली', 'काहिली', 'ठाहिली'],
-  };
   const TONE = {
     male:    { chip: 'bg-blue-50 text-blue-700 border-blue-200', num: 'bg-blue-600', title: 'छोरा' },
     female:  { chip: 'bg-pink-50 text-pink-700 border-pink-200', num: 'bg-pink-500', title: 'छोरी' },
     unknown: { chip: 'bg-violet-50 text-violet-700 border-violet-200', num: 'bg-violet-600', title: 'सन्तान' },
   };
   const tone = g => TONE[g] || TONE.unknown;
-  // same rule as App\Support\BirthOrder::word — last of 2+ is कान्छो/कान्छी
-  function word(g, rank, total) {
-    if (!WORDS[g] || total < 2) return null;
-    if (rank === total) return g === 'male' ? 'कान्छो' : 'कान्छी';
-    return WORDS[g][rank - 1] || null;
-  }
-
   function setSteps() {
     const parent = !!document.getElementById('parent_id').value;
     const child = !!document.getElementById('child_id').value;
@@ -456,17 +615,14 @@
       rows.push({ name: data.child.display_name, rank: chosen, isNew: true });
     }
     rows.sort((a, b) => (a.rank ?? 99) - (b.rank ?? 99));
-    const total = Math.max(0, ...rows.map(r => r.rank || 0));
 
     return `<div class="min-w-0 rounded-lg border border-slate-200 bg-white p-2.5">
       <div class="mb-2 inline-flex rounded-full border px-2 py-0.5 text-[11px] font-bold ${t.chip}">${t.title} (${npDigits(rows.length)})</div>
       <div class="space-y-1">
         ${rows.length ? rows.map(r => {
-          const w = word(g, r.rank, total);
           return `<div class="flex items-center gap-2 rounded-md px-2 py-1 text-xs ${r.isNew ? 'bg-yellow-50 ring-1 ring-yellow-300' : ''}">
             <span class="flex-none w-5 h-5 rounded-full ${t.num} text-white text-[10px] font-bold flex items-center justify-center">${npDigits(r.rank)}</span>
             <span class="min-w-0 flex-1 truncate ${r.isNew ? 'font-bold text-slate-900' : 'font-medium text-slate-700'}">${esc(r.name)}</span>
-            ${w ? `<span class="flex-none text-[10px] font-bold text-slate-500">${w}</span>` : ''}
             ${r.isNew ? '<span class="flex-none rounded bg-yellow-400 px-1 text-[10px] font-bold text-yellow-900">नयाँ</span>' : ''}
           </div>`;
         }).join('') : '<div class="px-2 text-xs text-slate-400">—</div>'}
@@ -485,8 +641,6 @@
     if (c) {
       const t = tone(c.gender);
       const opts = c.options.map(o => `<option value="${o.value}" ${o.value === chosen ? 'selected' : ''}>${esc(o.label)}</option>`).join('');
-      const total = Math.max(chosen || 0, ...(data.siblings || []).filter(r => r.gender === c.gender).map(r => r.birth?.rank || 0));
-      const w = chosen ? word(c.gender, chosen, total) : null;
       top = `<div class="flex flex-col md:flex-row md:items-end gap-4">
         <div class="min-w-0 flex-1">
           <div class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">चरण ३ · जन्म क्रम</div>
@@ -500,7 +654,7 @@
           <div class="mt-1 text-xs text-slate-500">
             <span class="font-semibold text-slate-700">${esc(data.parent.display_name)}</span> को
             <span class="font-bold ${c.gender === 'female' ? 'text-pink-600' : c.gender === 'male' ? 'text-blue-600' : 'text-violet-600'}">
-              ${chosen ? `${t.title} ${npDigits(chosen)}${w ? ' · ' + w : ''}` : '—'}</span>
+              ${chosen ? `${t.title} ${npDigits(chosen)}` : '—'}</span>
           </div>
         </div>
         <div class="w-full md:w-64">
@@ -509,7 +663,7 @@
             class="mt-1 w-full rounded-lg border-2 border-blue-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none">
             ${opts}
           </select>
-          <div class="mt-1 text-[11px] text-slate-400">पहिले नै भएका क्रम देखाइँदैन।</div>
+          <div class="mt-1 text-[11px] text-slate-400">१ देखि १० मध्ये छान्नुहोस्।</div>
         </div>
       </div>`;
     } else {
@@ -652,6 +806,7 @@
             ${parent.birth_year ? `<span>${esc(parent.birth_year)}</span>` : ''}
           </div>
           <div class="mt-1 text-[10px] text-slate-400">${group.children.length} ${group.children.length === 1 ? 'child' : 'children'}</div>
+          ${parent.id ? `<button type="button" data-edit-children="${parent.id}" class="mt-2 inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700 hover:bg-blue-100">✎ सम्पादन / क्रम</button>` : ''}
         </td>
         <td class="px-4 py-3">
           <div class="flex flex-wrap gap-1.5">${group.children.map(row => childChip(row, q, parentName)).join('')}</div>
@@ -663,10 +818,15 @@
       const parent = group.parent || {};
       const parentName = parent.display_name || '—';
       return `<div class="border-t p-4">
-        <div class="font-semibold text-slate-800">${highlight(parentName, q)}</div>
-        <div class="text-xs text-slate-400 mt-0.5">
-          ${parent.member_no ? highlight('#' + parent.member_no, q) : ''}
-          ${parent.pusta ? ` • ${highlight('पु.' + parent.pusta, q)}` : ''}
+        <div class="flex items-start gap-2">
+          <div class="min-w-0 flex-1">
+            <div class="font-semibold text-slate-800">${highlight(parentName, q)}</div>
+            <div class="text-xs text-slate-400 mt-0.5">
+              ${parent.member_no ? highlight('#' + parent.member_no, q) : ''}
+              ${parent.pusta ? ` • ${highlight('पु.' + parent.pusta, q)}` : ''}
+            </div>
+          </div>
+          ${parent.id ? `<button type="button" data-edit-children="${parent.id}" class="shrink-0 inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700 hover:bg-blue-100">✎ सम्पादन</button>` : ''}
         </div>
         <div class="mt-3 flex flex-wrap gap-1.5">${group.children.map(row => childChip(row, q, parentName)).join('')}</div>
       </div>`;
@@ -723,4 +883,6 @@
   });
 })();
 </script>
+@include('partials.marriage-form', ['marriagePerson' => null, 'returnBack' => true])
+@include('partials.photo-camera')
 @endsection

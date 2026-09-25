@@ -1,25 +1,25 @@
 @extends('layouts.app')
-@section('title', 'मेरा अनुरोधहरू')
+@section('title', \App\Support\FrontendLocale::text('मेरा अनुरोधहरू'))
 
 @section('content')
 <div class="max-w-3xl mx-auto py-8">
 
   <div class="flex items-center justify-between gap-3 mb-6 flex-wrap">
     <div>
-      <h1 class="text-2xl font-bold text-gray-900">मेरा अनुरोधहरू</h1>
-      <p class="text-sm text-gray-500 mt-0.5">तपाईंले पठाएका सबै परिवर्तन अनुरोधहरू</p>
+      <h1 class="text-2xl font-bold text-gray-900">{{ \App\Support\FrontendLocale::text('मेरा अनुरोधहरू') }}</h1>
+      <p class="text-sm text-gray-500 mt-0.5">{{ \App\Support\FrontendLocale::text('तपाईंले पठाएका सबै परिवर्तन अनुरोधहरू') }}</p>
     </div>
-    <a href="{{ route('home') }}"
+    <a href="{{ \App\Support\FrontendLocale::route('home') }}"
       class="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1">
-      ← गृहपृष्ठ
+      {{ \App\Support\FrontendLocale::text('← गृहपृष्ठ') }}
     </a>
   </div>
 
   @if($requests->isEmpty())
     <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-12 text-center">
       <div class="text-5xl mb-4">📋</div>
-      <div class="text-gray-500 font-medium">तपाईंले अहिलेसम्म कुनै अनुरोध पठाउनुभएको छैन।</div>
-      <p class="text-sm text-gray-400 mt-1">कुनै सदस्यको प्रोफाइल खोल्नुहोस् र अनुरोध पठाउनुहोस्।</p>
+      <div class="text-gray-500 font-medium">{{ \App\Support\FrontendLocale::text('तपाईंले अहिलेसम्म कुनै अनुरोध पठाउनुभएको छैन।') }}</div>
+      <p class="text-sm text-gray-400 mt-1">{{ \App\Support\FrontendLocale::text('कुनै सदस्यको प्रोफाइल खोल्नुहोस् र अनुरोध पठाउनुहोस्।') }}</p>
     </div>
   @else
 
@@ -31,13 +31,13 @@
     @endphp
     <div class="flex gap-3 mb-5 flex-wrap">
       <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700 border border-amber-200">
-        ⏳ {{ $pending }} Pending
+        ⏳ {{ $pending }} {{ \App\Support\FrontendLocale::text('Pending') }}
       </span>
       <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700 border border-green-200">
-        ✓ {{ $approved }} Approved
+        ✓ {{ $approved }} {{ \App\Support\FrontendLocale::text('Approved') }}
       </span>
       <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700 border border-red-200">
-        ✗ {{ $rejected }} Rejected
+        ✗ {{ $rejected }} {{ \App\Support\FrontendLocale::text('Rejected') }}
       </span>
     </div>
 
@@ -62,11 +62,11 @@
           'not_listed'     => '📋',
         ];
         $typeLabels = [
-          'add_child'      => 'नयाँ सन्तान',
-          'mark_deceased'  => 'मृत्यु सूचना',
-          'update_profile' => 'प्रोफाइल सम्पादन',
-          'add_union'      => 'विवाह जानकारी',
-          'not_listed'     => 'सूचीमा नभएको',
+          'add_child'      => \App\Support\FrontendLocale::text('नयाँ सन्तान'),
+          'mark_deceased'  => \App\Support\FrontendLocale::text('मृत्यु सूचना'),
+          'update_profile' => \App\Support\FrontendLocale::text('प्रोफाइल सम्पादन'),
+          'add_union'      => \App\Support\FrontendLocale::text('विवाह जानकारी'),
+          'not_listed'     => \App\Support\FrontendLocale::text('सूचीमा नभएको'),
         ];
       @endphp
       <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden
@@ -117,9 +117,9 @@
           @if($req->status !== 'pending')
           <div class="mt-3 pt-3 border-t border-gray-100 flex items-start gap-2 flex-wrap text-xs text-gray-500">
             @if($req->status === 'approved')
-              <span class="text-green-600 font-semibold">✓ Approved</span>
+              <span class="text-green-600 font-semibold">{{ \App\Support\FrontendLocale::text('✓ Approved') }}</span>
             @else
-              <span class="text-red-600 font-semibold">✗ Rejected</span>
+              <span class="text-red-600 font-semibold">{{ \App\Support\FrontendLocale::text('✗ Rejected') }}</span>
             @endif
             @if($req->reviewed_at)
               <span>on {{ $req->reviewed_at->format('d M Y') }}</span>

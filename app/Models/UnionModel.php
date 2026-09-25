@@ -23,6 +23,12 @@ class UnionModel extends Model
     protected static function booted()
 {
     static::saved(fn () => \App\Http\Controllers\Admin\PeopleTableController::forgetCache());
+    // a woman marrying into the family becomes बुहारी (whichever screen added the marriage)
+    static::created(function (UnionModel $u) {
+        foreach ([$u->spouse1, $u->spouse2] as $spouse) {
+            if ($spouse) \App\Support\MemberType::markBuhariIfMarriedIn($spouse);
+        }
+    });
     static::deleted(fn () => \App\Http\Controllers\Admin\PeopleTableController::forgetCache());
 }
 }

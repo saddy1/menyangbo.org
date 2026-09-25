@@ -1,6 +1,8 @@
 {{-- resources/views/tree/simple.blade.php --}}
 @extends('layouts.app')
-@section('title', 'वंशावली')
+@section('title', \App\Support\FrontendLocale::text('वंशावली'))
+
+@section('meta_description', \App\Support\FrontendLocale::text('मेन्याङ्बो वंशको वंशावली, पुस्ता र पारिवारिक सम्बन्धहरू हेर्नुहोस्।'))
 
 @section('content')
     <style>
@@ -259,7 +261,7 @@
         {{-- ── TOP BAR ── --}}
         <div class="topbar-wrap flex items-center gap-3 px-4 py-3 border-b bg-white sticky top-0 z-20">
             <div class="flex items-center gap-2 text-sm text-slate-700">
-                <span class="font-semibold">जुम नियन्त्रण</span>
+                <span class="font-semibold">{{ \App\Support\FrontendLocale::text('जुम नियन्त्रण') }}</span>
                 <button class="w-9 h-9 rounded-full border flex items-center justify-center hover:bg-slate-50"
                     @click="zoomOut()">−</button>
                 <button class="w-9 h-9 rounded-full border flex items-center justify-center hover:bg-slate-50"
@@ -269,7 +271,7 @@
             </div>
 
             <div class="flex items-center gap-2 text-sm text-slate-700">
-                <span>Tree level :</span>
+                <span>{{ \App\Support\FrontendLocale::text('Tree level :') }}</span>
                 <select class="border rounded-lg px-2 py-1" x-model="depth" @change="reload()">
                     <template x-for="d in [2,5,10,15,20,30]" :key="d">
                         <option :value="d" x-text="d"></option>
@@ -278,29 +280,29 @@
             </div>
 
             <div class="flex items-center gap-2 text-sm text-slate-700">
-                <span class="font-semibold">Pusta :</span>
+                <span class="font-semibold">{{ \App\Support\FrontendLocale::text('Pusta :') }}</span>
                 <button class="w-9 h-9 rounded-full border hover:bg-slate-50 flex items-center justify-center"
-                    title="Previous pusta" @click="pustaDown()">▼</button>
-                <span class="min-w-[44px] text-center font-bold text-slate-800" x-text="currentPusta || '—'"></span>
+                    title="{{ \App\Support\FrontendLocale::text('Previous pusta') }}" @click="pustaDown()">▼</button>
+                <span class="min-w-[44px] text-center font-bold text-slate-800" x-text="currentPusta ? npDigits(currentPusta) : '—'"></span>
                 <button class="w-9 h-9 rounded-full border hover:bg-slate-50 flex items-center justify-center"
-                    title="Next pusta" @click="pustaUp()">▲</button>
+                    title="{{ \App\Support\FrontendLocale::text('Next pusta') }}" @click="pustaUp()">▲</button>
             </div>
 
             <div class="flex-1 text-center text-slate-700 font-semibold min-w-[120px]">
-                <span x-text="'Level ' + levelText"></span>
+                <span x-text="@js(\App\Support\FrontendLocale::text('Level')) + ' ' + levelText"></span>
             </div>
 
             <button type="button" @click="toggleUnconnected()"
                 class="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm font-semibold text-amber-800 hover:bg-amber-100"
-                title="रुखमा नजोडिएका सदस्यहरू">
-                नजोडिएका सदस्य
+                title="{{ \App\Support\FrontendLocale::text('रुखमा नजोडिएका सदस्यहरू') }}">
+                {{ \App\Support\FrontendLocale::text('नजोडिएका सदस्य') }}
                 <span class="rounded-full bg-amber-500 px-2 py-0.5 text-[11px] font-bold text-white"
                     x-text="unconnectedCount === null ? '…' : unconnectedCount"></span>
             </button>
 
             <div class="searchBox relative w-[360px] ml-auto">
                 <input type="text" class="w-full border rounded-lg px-3 py-2 text-sm"
-                    placeholder="Search Members by ID/Name..."
+                    placeholder="{{ \App\Support\FrontendLocale::text('Search Members by ID/Name...') }}"
                     @input="onSearch($event.target.value)"
                     @focus="searchOpen=true"
                     @keydown.escape="searchOpen=false" />
@@ -319,13 +321,13 @@
                                     <span class="text-slate-500 font-normal" x-show="r.member_number" x-text="'(#'+r.member_number+')'"></span>
                                 </span>
                                 <span class="block text-[11px] text-slate-500 truncate" x-show="r.father_name">
-                                    बुबा: <span x-text="r.father_name"></span>
+                                    {{ \App\Support\FrontendLocale::text('बुबा:') }} <span x-text="r.father_name"></span>
                                 </span>
                             </span>
-                            <span class="ml-auto text-slate-500 text-xs" x-text="r.pusta ? ('पु.'+r.pusta) : ''"></span>
+                            <span class="ml-auto text-slate-500 text-xs" x-text="r.pusta ? (@js(\App\Support\FrontendLocale::text('पु.'))+r.pusta) : ''"></span>
                         </button>
                     </template>
-                    <div x-show="results.length===0" class="px-3 py-2 text-sm text-slate-500">No results</div>
+                    <div x-show="results.length===0" class="px-3 py-2 text-sm text-slate-500">{{ \App\Support\FrontendLocale::text('No results') }}</div>
                 </div>
             </div>
         </div>
@@ -337,10 +339,10 @@
                 <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600">
                     ↓
                 </span>
-                Tree Download
+                {{ \App\Support\FrontendLocale::text('Tree Download') }}
             </div>
             <div class="text-xs text-slate-300">
-                Uses current root, selected level, photos, spouses, and compact tree layout.
+                {{ \App\Support\FrontendLocale::text('Uses current root, selected level, photos, spouses, and compact tree layout.') }}
             </div>
             <div class="ml-auto flex flex-wrap items-center gap-2">
                 <select x-model="exportPaper" class="rounded-lg border border-white/10 bg-white/10 px-2 py-2 text-xs font-bold text-white">
@@ -349,11 +351,11 @@
                     <option class="text-slate-900" value="A2">A2</option>
                     <option class="text-slate-900" value="A1">A1</option>
                     <option class="text-slate-900" value="A0">A0</option>
-                    <option class="text-slate-900" value="CUSTOM">Custom / Flex</option>
+                    <option class="text-slate-900" value="CUSTOM">{{ \App\Support\FrontendLocale::text('Custom / Flex') }}</option>
                 </select>
                 <select x-model="exportOrientation" class="rounded-lg border border-white/10 bg-white/10 px-2 py-2 text-xs font-bold text-white">
-                    <option class="text-slate-900" value="landscape">Landscape</option>
-                    <option class="text-slate-900" value="portrait">Portrait</option>
+                    <option class="text-slate-900" value="landscape">{{ \App\Support\FrontendLocale::text('Landscape') }}</option>
+                    <option class="text-slate-900" value="portrait">{{ \App\Support\FrontendLocale::text('Portrait') }}</option>
                 </select>
                 <select x-model.number="exportScale" class="rounded-lg border border-white/10 bg-white/10 px-2 py-2 text-xs font-bold text-white" title="PNG quality">
                     <option class="text-slate-900" value="2">PNG 2x</option>
@@ -375,20 +377,20 @@
                 </template>
                 <button type="button" @click="downloadTreeSvg()" :disabled="exportBusy"
                     class="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/15 border border-white/10 text-xs font-bold">
-                    Download SVG
+                    {{ \App\Support\FrontendLocale::text('Download SVG') }}
                 </button>
                 <button type="button" @click="downloadTreePng()" :disabled="exportBusy"
                     class="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/15 border border-white/10 text-xs font-bold">
-                    Download PNG
+                    {{ \App\Support\FrontendLocale::text('Download PNG') }}
                 </button>
                 <button type="button" @click="printTreePdf()" :disabled="exportBusy"
                     class="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-xs font-bold">
-                    Print / Save PDF
+                    {{ \App\Support\FrontendLocale::text('Print / Save PDF') }}
                 </button>
-                <span x-show="exportBusy" class="text-xs text-blue-200">Preparing...</span>
+                <span x-show="exportBusy" class="text-xs text-blue-200">{{ \App\Support\FrontendLocale::text('Preparing...') }}</span>
                 <button type="button" @click="exportOpen=false"
                     class="px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-bold">
-                    Hide
+                    {{ \App\Support\FrontendLocale::text('Hide') }}
                 </button>
             </div>
         </div>
@@ -396,7 +398,7 @@
         <div x-show="canExport && !exportOpen" x-cloak class="fixed bottom-5 right-5 z-40">
             <button type="button" @click="exportOpen=true"
                 class="rounded-full bg-slate-900 text-white shadow-xl px-4 py-3 text-sm font-bold hover:bg-slate-800">
-                ↓ Tree Export
+                {{ \App\Support\FrontendLocale::text('↓ Tree Export') }}
             </button>
         </div>
 
@@ -405,10 +407,10 @@
             <svg x-ref="svg" class="tree-canvas absolute inset-0 w-full h-full"></svg>
 
             <div class="tree-legend">
-                <span><i :style="`background:${COLORS.male}`"></i>छोरा / पुरुष</span>
-                <span><i :style="`background:${COLORS.female}`"></i>छोरी</span>
-                <span><i :style="`background:${COLORS.buhari}`"></i>बुहारी</span>
-                <span><i :style="`background:${COLORS.unknown}`"></i>अज्ञात</span>
+                <span><i :style="`background:${COLORS.male}`"></i>{{ \App\Support\FrontendLocale::text('छोरा / पुरुष') }}</span>
+                <span><i :style="`background:${COLORS.female}`"></i>{{ \App\Support\FrontendLocale::text('छोरी') }}</span>
+                <span><i :style="`background:${COLORS.buhari}`"></i>{{ \App\Support\FrontendLocale::text('बुहारी') }}</span>
+                <span><i :style="`background:${COLORS.unknown}`"></i>{{ \App\Support\FrontendLocale::text('अज्ञात') }}</span>
             </div>
         </div>
 
@@ -420,8 +422,8 @@
             class="fixed right-0 top-0 z-50 h-full w-[380px] max-w-full bg-white shadow-2xl border-l border-slate-200 flex flex-col">
             <div class="px-4 py-3 border-b border-slate-100 flex items-center gap-2">
                 <div class="min-w-0">
-                    <div class="font-bold text-slate-900">नजोडिएका सदस्यहरू</div>
-                    <div class="text-[11px] text-slate-500">मुख्य वंशावली रुखमा नजोडिएका नामहरू</div>
+                    <div class="font-bold text-slate-900">{{ \App\Support\FrontendLocale::text('नजोडिएका सदस्यहरू') }}</div>
+                    <div class="text-[11px] text-slate-500">{{ \App\Support\FrontendLocale::text('मुख्य वंशावली रुखमा नजोडिएका नामहरू') }}</div>
                 </div>
                 <button type="button" @click="unconnectedOpen=false"
                     class="ml-auto w-8 h-8 rounded-full hover:bg-slate-100 text-slate-500 text-lg leading-none">×</button>
@@ -431,27 +433,27 @@
                 <button type="button" @click="unconnectedTab='roots'"
                     class="flex-1 rounded-lg px-3 py-2 text-xs font-bold border"
                     :class="unconnectedTab==='roots' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'">
-                    छुट्टै परिवार (<span x-text="unconnected.roots.length"></span>)
+                    {{ \App\Support\FrontendLocale::text('छुट्टै परिवार (') }}<span x-text="unconnected.roots.length"></span>)
                 </button>
                 <button type="button" @click="unconnectedTab='isolated'"
                     class="flex-1 rounded-lg px-3 py-2 text-xs font-bold border"
                     :class="unconnectedTab==='isolated' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'">
-                    एक्लो नाम (<span x-text="unconnected.isolated.length"></span>)
+                    {{ \App\Support\FrontendLocale::text('एक्लो नाम (') }}<span x-text="unconnected.isolated.length"></span>)
                 </button>
             </div>
             <p class="px-4 pt-2 text-[11px] leading-snug text-slate-500"
                 x-text="unconnectedTab==='roots'
-                    ? 'बुबा/आमा नजोडिएका तर छोराछोरी भएका — यिनको परिवार मुख्य रुखमा जोड्न बाँकी छ।'
-                    : 'न बुबा/आमा, न छोराछोरी जोडिएका — कुनै नाता नभएका नामहरू।'"></p>
+                    ? @js(\App\Support\FrontendLocale::text('बुबा/आमा नजोडिएका तर छोराछोरी भएका — यिनको परिवार मुख्य रुखमा जोड्न बाँकी छ।'))
+                    : @js(\App\Support\FrontendLocale::text('न बुबा/आमा, न छोराछोरी जोडिएका — कुनै नाता नभएका नामहरू।'))"></p>
 
             <div class="px-4 pt-2">
-                <input type="text" x-model="unconnectedFilter" placeholder="नाम वा सदस्य नं. खोज्नुहोस्…"
+                <input type="text" x-model="unconnectedFilter" placeholder="{{ \App\Support\FrontendLocale::text('नाम वा सदस्य नं. खोज्नुहोस्…') }}"
                     class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">
             </div>
 
             <div class="flex-1 overflow-y-auto px-2 py-2">
                 <template x-if="unconnectedLoading">
-                    <div class="px-3 py-6 text-center text-sm text-slate-400">Loading…</div>
+                    <div class="px-3 py-6 text-center text-sm text-slate-400">{{ \App\Support\FrontendLocale::text('Loading…') }}</div>
                 </template>
                 <template x-for="u in filteredUnconnected()" :key="u.id">
                     <div class="flex items-center gap-3 rounded-xl px-2 py-2 hover:bg-slate-50">
@@ -461,21 +463,21 @@
                             <div class="font-semibold text-sm text-slate-900 truncate" x-text="u.display_name"></div>
                             <div class="text-[11px] text-slate-500 truncate">
                                 <span x-text="u.member_no || ('#'+u.id)"></span>
-                                <span x-show="u.pusta" x-text="' · पु.'+u.pusta"></span>
-                                <span x-show="u.spouse_names.length" x-text="' · जीवनसाथी: '+u.spouse_names.join(', ')"></span>
+                                <span x-show="u.pusta" x-text="@js(\App\Support\FrontendLocale::text(' · पु.'))+u.pusta"></span>
+                                <span x-show="u.spouse_names.length" x-text="@js(\App\Support\FrontendLocale::text(' · जीवनसाथी: '))+u.spouse_names.join(', ')"></span>
                             </div>
                         </div>
                         <div class="flex-none flex gap-1">
                             <button type="button" @click="unconnectedOpen=false; setRootById(u.id)"
-                                class="rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-bold text-slate-700 hover:bg-white">रुख</button>
-                            <a :href="isAdmin ? editUrl(u.id) : memberUrl(u.id)"
+                                class="rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-bold text-slate-700 hover:bg-white">{{ \App\Support\FrontendLocale::text('रुख') }}</button>
+                            <a :href="isAdmin ? linkUrl(u.id) : memberUrl(u.id)"
                                 class="rounded-lg bg-slate-900 px-2 py-1 text-[11px] font-bold text-white hover:bg-slate-700"
-                                x-text="isAdmin ? 'जोड्नुहोस्' : 'विवरण'"></a>
+                                x-text="isAdmin ? @js(\App\Support\FrontendLocale::text('जोड्नुहोस्')) : @js(\App\Support\FrontendLocale::text('विवरण'))"></a>
                         </div>
                     </div>
                 </template>
                 <template x-if="!unconnectedLoading && filteredUnconnected().length===0">
-                    <div class="px-3 py-6 text-center text-sm text-slate-400">कुनै नाम छैन</div>
+                    <div class="px-3 py-6 text-center text-sm text-slate-400">{{ \App\Support\FrontendLocale::text('कुनै नाम छैन') }}</div>
                 </template>
             </div>
         </aside>
@@ -490,7 +492,7 @@
             @mouseleave="hoverLock=false; closeHoverSoon()">
 
             <template x-if="hoverLoading">
-                <div style="padding:10px 12px; font-size:10px; color:#94a3b8;">Loading…</div>
+                <div style="padding:10px 12px; font-size:10px; color:#94a3b8;">{{ \App\Support\FrontendLocale::text('Loading…') }}</div>
             </template>
 
             <template x-if="hoverPerson && !hoverLoading">
@@ -511,11 +513,11 @@
                             <div style="font-size:10px; color:#64748b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:210px;"
                                  x-text="[hoverPerson.display_name_np, hoverPerson.display_name_limbu].filter(Boolean).join(' / ')"></div>
                             <div style="display:flex; flex-wrap:wrap; align-items:center; gap:4px; margin-top:3px;">
-                                <span class="pc-member" title="सदस्य नम्बर">सदस्य नं. <span x-text="hoverPerson.member_no || ('#'+hoverPerson.id)"></span></span>
-                                <span class="pc-tag pc-tag-slate" x-show="hoverPerson.pusta" x-text="'पु.'+hoverPerson.pusta"></span>
-                                <span class="pc-tag" x-show="hoverPerson.is_buhari" style="background:#fef3c7; color:#b45309;">बुहारी</span>
+                                <span class="pc-member" title="{{ \App\Support\FrontendLocale::text('सदस्य नम्बर') }}">{{ \App\Support\FrontendLocale::text('सदस्य नं.') }} <span x-text="hoverPerson.member_no || ('#'+hoverPerson.id)"></span></span>
+                                <span class="pc-tag pc-tag-slate" x-show="hoverPerson.pusta" x-text="@js(\App\Support\FrontendLocale::text('पु.'))+hoverPerson.pusta"></span>
+                                <span class="pc-tag" x-show="hoverPerson.is_buhari" style="background:#fef3c7; color:#b45309;">{{ \App\Support\FrontendLocale::text('बुहारी') }}</span>
                                 <span class="pc-tag" x-show="hoverPerson.birth && !hoverPerson.is_buhari"
-                                    :class="childTagClass(hoverPerson.gender)" x-text="hoverPerson.birth?.label"></span>
+                                    :class="childTagClass(hoverPerson.gender)" x-text="birthLabel(hoverPerson.birth?.label)"></span>
                             </div>
                         </div>
                     </div>
@@ -524,15 +526,15 @@
                     <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px; margin-bottom:8px;">
                         <button style="border:1px solid #e2e8f0; border-radius:6px; padding:3px 0; font-size:10px; font-weight:600; color:#374151; background:#fff; cursor:pointer;"
                             onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='#fff'"
-                            @click="setRootById(hoverPerson.id)">Root</button>
+                            @click="setRootById(hoverPerson.id)">{{ \App\Support\FrontendLocale::text('Root') }}</button>
                         <button style="border:none; border-radius:6px; padding:3px 0; font-size:10px; font-weight:600; color:#fff; background:#1e293b; cursor:pointer;"
                             onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'"
-                            @click="openPerson(hoverPerson.id)">More</button>
+                            @click="openPerson(hoverPerson.id)">{{ \App\Support\FrontendLocale::text('More') }}</button>
                     </div>
 
                     {{-- Family --}}
                     <div class="pc-section">
-                        <div class="pc-label">परिवार / Family</div>
+                        <div class="pc-label">{{ \App\Support\FrontendLocale::text('परिवार / Family') }}</div>
                         <template x-if="!hoverPerson.father && !hoverPerson.mother && !hoverPerson.grandfather">
                             <span class="pc-empty">—</span>
                         </template>
@@ -546,7 +548,7 @@
 
                     {{-- Spouses --}}
                     <div class="pc-section">
-                        <div class="pc-label">Wife / Husband</div>
+                        <div class="pc-label">{{ \App\Support\FrontendLocale::text('Wife / Husband') }}</div>
                         <template x-if="(hoverPerson.spouses||[]).length===0">
                             <span class="pc-empty">—</span>
                         </template>
@@ -561,7 +563,7 @@
 
                     {{-- Children: sons and daughters in separate columns --}}
                     <div class="pc-section">
-                        <div class="pc-label">छोराछोरी / Children</div>
+                        <div class="pc-label">{{ \App\Support\FrontendLocale::text('छोराछोरी / Children') }}</div>
                         <template x-if="(hoverPerson.children||[]).length===0">
                             <span class="pc-empty">—</span>
                         </template>
@@ -574,11 +576,11 @@
                                     </template>
                                     <template x-for="cc in col.items" :key="cc.id">
                                         <button class="pc-row" style="align-items:flex-start;" @click="setRootById(cc.id)"
-                                            :title="[cc.birth?.label, cc.member_no].filter(Boolean).join(' · ')">
+                                            :title="[birthLabel(cc.birth?.label), cc.member_no].filter(Boolean).join(' · ')">
                                             <span class="pc-num" :style="`background:${genderColor(cc.gender)}`" x-text="cc.birth ? npDigits(cc.birth.rank) : '•'"></span>
                                             <span style="min-width:0;">
                                                 <span class="pc-name" style="display:block;" x-text="cc.display_name"></span>
-                                                <span class="pc-sub" x-text="[cc.birth?.word, cc.member_no].filter(Boolean).join(' · ')"></span>
+                                                <span class="pc-sub" x-text="[birthLabel(cc.birth?.word), cc.member_no].filter(Boolean).join(' · ')"></span>
                                             </span>
                                         </button>
                                     </template>
@@ -608,22 +610,28 @@
             genderColor(g){ return this.COLORS[g==='male'||g==='female' ? g : 'unknown']; },
             personColor(p){ return p?.is_buhari ? this.COLORS.buhari : this.genderColor(p?.gender); },
             genderLetter(g){ return g==='male'?'M': g==='female'?'F':'?'; },
-            npDigits(n){ return String(n ?? '').replace(/[0-9]/g, d => '०१२३४५६७८९'[d]); },
-            memberUrl(id){ return @json(url('/member')) + '/' + id; },
-            editUrl(id){ return @json(url('/admin/persons')) + '/' + id + '/edit'; },
+            npDigits(n){ return @js(\App\Support\FrontendLocale::locale()) === 'en' ? this.toENdigits(n) : String(n ?? '').replace(/[0-9]/g, d => '०१२३४५६७८९'[d]); },
+            birthLabel(label){
+                if (@js(\App\Support\FrontendLocale::locale()) !== 'en') return label || '';
+                const words = @js(collect(['छोरा', 'छोरी', 'सन्तान', 'जेठो', 'जेठी', 'माहिलो', 'माहिली', 'साहिलो', 'साहिली', 'काहिलो', 'काहिली', 'अन्तरे', 'अन्तरी', 'जन्तरे', 'जन्तरी', 'कान्छो', 'कान्छी'])->mapWithKeys(fn ($word) => [$word => \App\Support\FrontendLocale::text($word)]));
+                return this.toENdigits(String(label || '').split(' ').map(word => words[word] || word).join(' '));
+            },
+            memberUrl(id){ return @json(url('/member')) + '/' + id + '?lang=' + @js(\App\Support\FrontendLocale::locale()); },
+            // admin @js(\App\Support\FrontendLocale::text('जोड्नुहोस्')): relationships page with this person pre-selected as the child
+            linkUrl(id){ return @json(\App\Support\FrontendLocale::route('admin.relationships.index')) + '?child_id=' + encodeURIComponent(id); },
             childColumns(p){
                 const kids = p?.children || [];
                 const cols = [
-                    { key:'sons', title:'छोरा', className:'pc-tag-blue', items: kids.filter(c => c.gender === 'male') },
-                    { key:'daughters', title:'छोरी', className:'pc-tag-pink', items: kids.filter(c => c.gender === 'female') },
+                    { key:'sons', title:@js(\App\Support\FrontendLocale::text('छोरा')), className:'pc-tag-blue', items: kids.filter(c => c.gender === 'male') },
+                    { key:'daughters', title:@js(\App\Support\FrontendLocale::text('छोरी')), className:'pc-tag-pink', items: kids.filter(c => c.gender === 'female') },
                 ];
                 const others = kids.filter(c => c.gender !== 'male' && c.gender !== 'female');
-                if (others.length) cols.push({ key:'others', title:'सन्तान', className:'pc-tag-slate', items: others });
+                if (others.length) cols.push({ key:'others', title:@js(\App\Support\FrontendLocale::text('सन्तान')), className:'pc-tag-slate', items: others });
                 return cols;
             },
             assetUrl(path){ return path ? @json(asset('')) + String(path).replace(/^\/+/, '') : ''; },
-            parentLabel(p){ return `${p.gender === 'male' ? 'Father' : p.gender === 'female' ? 'Mother' : 'Parent'}: ${p.display_name}`; },
-            spouseLabel(p){ return `${p.gender === 'male' ? 'Husband' : p.gender === 'female' ? 'Wife' : 'Spouse'}: ${p.display_name}`; },
+            parentLabel(p){ return `${p.gender === 'male' ? @js(\App\Support\FrontendLocale::text('Father')) : p.gender === 'female' ? @js(\App\Support\FrontendLocale::text('Mother')) : @js(\App\Support\FrontendLocale::text('Parent'))}: ${p.display_name}`; },
+            spouseLabel(p){ return `${p.gender === 'male' ? @js(\App\Support\FrontendLocale::text('Husband')) : p.gender === 'female' ? @js(\App\Support\FrontendLocale::text('Wife')) : @js(\App\Support\FrontendLocale::text('Spouse'))}: ${p.display_name}`; },
             compactName(p){
                 if (!p) return '—';
                 const extra = [p.display_name_np, p.display_name_limbu].filter(Boolean).join(' / ');
@@ -631,13 +639,13 @@
             },
             familyRows(p){
                 const rows = [];
-                if (p?.grandfather) rows.push({ key:'grandfather', label:'बाजे', className:'pc-tag-amber', person:p.grandfather });
-                if (p?.father) rows.push({ key:'father', label:'बुबा', className:'pc-tag-blue', person:p.father });
-                if (p?.mother) rows.push({ key:'mother', label:'आमा', className:'pc-tag-pink', person:p.mother });
+                if (p?.grandfather) rows.push({ key:'grandfather', label:@js(\App\Support\FrontendLocale::text('बाजे')), className:'pc-tag-amber', person:p.grandfather });
+                if (p?.father) rows.push({ key:'father', label:@js(\App\Support\FrontendLocale::text('बुबा')), className:'pc-tag-blue', person:p.father });
+                if (p?.mother) rows.push({ key:'mother', label:@js(\App\Support\FrontendLocale::text('आमा')), className:'pc-tag-pink', person:p.mother });
                 return rows;
             },
             childRelationLabel(g){
-                return g === 'male' ? 'छोरा' : (g === 'female' ? 'छोरी' : 'सन्तान');
+                return g === 'male' ? @js(\App\Support\FrontendLocale::text('छोरा')) : (g === 'female' ? @js(\App\Support\FrontendLocale::text('छोरी')) : @js(\App\Support\FrontendLocale::text('सन्तान')));
             },
             childTagClass(g){
                 return g === 'male' ? 'pc-tag-blue' : (g === 'female' ? 'pc-tag-pink' : 'pc-tag-slate');
@@ -781,7 +789,7 @@
             async loadUnconnected() {
                 this.unconnectedLoading = true;
                 try {
-                    const r = await fetch(@json(route('tree.unconnected')));
+                    const r = await fetch(@json(\App\Support\FrontendLocale::route('tree.unconnected')));
                     const data = await r.json();
                     this.unconnected = { roots: data.roots || [], isolated: data.isolated || [] };
                     this.unconnectedCount = this.unconnected.roots.length + this.unconnected.isolated.length;
@@ -807,7 +815,7 @@
                DATA / DRAW
             ═══════════════════════════════ */
             async reload() {
-                const url = new URL(@json(route('tree.json')), window.location.origin);
+                const url = new URL(@json(\App\Support\FrontendLocale::route('tree.json')), window.location.origin);
                 url.searchParams.set('root_id', this.rootId);
                 url.searchParams.set('depth',   this.depth);
                 const res  = await fetch(url);
@@ -938,7 +946,7 @@
                      .attr('text-anchor','middle').attr('y',44)
                      .attr('font-size','8px').attr('fill', person.is_buhari ? '#b45309' : '#64748b')
                      .attr('stroke','#f8fafc').attr('stroke-width',3).attr('paint-order','stroke')
-                     .text(() => [person.is_buhari ? 'बुहारी' : '', person.pusta ? ('पु.'+person.pusta) : '']
+                     .text(() => [person.is_buhari ? @js(\App\Support\FrontendLocale::text('बुहारी')) : '', person.pusta ? (@js(\App\Support\FrontendLocale::text('पु.'))+this.npDigits(person.pusta)) : '']
                          .filter(Boolean).join(' · '));
 
                     // birth-order flag: छोरा १ · जेठो / छोरी २ · माहिली
@@ -956,7 +964,7 @@
                             .attr('text-anchor','middle').attr('y', 3)
                             .attr('font-size','8.5px').attr('font-weight','800')
                             .attr('fill', tone[2])
-                            .text(person.birth.label);
+                            .text(this.birthLabel(person.birth.label));
                         const w = (label.node().getComputedTextLength?.() || person.birth.label.length * 5.5) + 12;
                         rect.attr('x', -w / 2).attr('y', -7.5).attr('width', w).attr('height', 15);
                     }
@@ -1191,7 +1199,7 @@
                 this._searchTimer = setTimeout(async () => {
                     const t = (term||'').trim();
                     if (!t) { this.searchOpen=false; this.results=[]; return; }
-                    const url = new URL(@json(route('people.search')), window.location.origin);
+                    const url = new URL(@json(\App\Support\FrontendLocale::route('people.search')), window.location.origin);
                     url.searchParams.set('term', t);
                     const r = await fetch(url);
                     const rows = await r.json();
@@ -1212,7 +1220,7 @@
                PUSTA navigation
             ═══════════════════════════════ */
             async loadByPusta(pustaNumber) {
-                const url = new URL(@json(route('people.firstByPusta')), window.location.origin);
+                const url = new URL(@json(\App\Support\FrontendLocale::route('people.firstByPusta')), window.location.origin);
                 url.searchParams.set('pusta', String(pustaNumber));
                 const r      = await fetch(url);
                 const person = await r.json();
@@ -1272,10 +1280,10 @@
                 const min = pustas.length ? Math.min(...pustas) : null;
                 const max = pustas.length ? Math.max(...pustas) : null;
                 if (min && max && min !== max) {
-                    return `पुस्ता ${min} देखि ${max} सम्म वंशावली रुख चित्र`;
+                    return @js(__('पुस्ता :min देखि :max सम्म वंशावली रुख चित्र')).replace(':min', min).replace(':max', max);
                 }
                 if (min) {
-                    return `पुस्ता ${min} को वंशावली रुख चित्र`;
+                    return @js(__('पुस्ता :min को वंशावली रुख चित्र')).replace(':min', min);
                 }
                 return 'वंशावली रुख चित्र';
             },

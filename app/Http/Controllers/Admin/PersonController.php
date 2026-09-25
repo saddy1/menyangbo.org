@@ -8,6 +8,7 @@ use App\Models\UnionModel;
 use App\Support\MemberNumber;
 use App\Support\BirthOrder;
 use App\Support\SiblingOrder;
+use App\Support\SpouseDetails;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -166,6 +167,8 @@ class PersonController extends Controller
     public function store(Request $request)
     {
         $this->mergeNamePartsFromDisplayName($request);
+        // English name is required for new people (older records may still lack it)
+        $request->validate(['display_name_np' => ['required', 'string', 'max:255']], [], ['display_name_np' => 'Full Name (English)']);
         $data = $this->validatePerson($request);
         unset($data['birth_order']); // set only through SiblingOrder::assign
         $data['is_deceased'] = $request->boolean('is_deceased');
@@ -234,9 +237,6 @@ class PersonController extends Controller
 
         $birthOrder = (int) $request->input('birth_order');
         $orderParent = $birthOrder ? SiblingOrder::parentFor($person) : null;
-        if ($orderParent && isset(SiblingOrder::taken($orderParent, $data['gender'], $person->id)[$birthOrder])) {
-            return back()->withErrors(['birth_order' => 'यो सन्तान क्रम पहिले नै अर्को सन्तानको हो। अर्को छान्नुहोस्।'])->withInput();
-        }
 
         $person->update($data);
 
@@ -249,6 +249,80 @@ class PersonController extends Controller
         }
 
         return redirect()->route('admin.persons.index')->with('success', 'अद्यावधिक गरियो।');
+    }
+
+    /** Fields an admin can change one at a time from the member page. */
+    private const INLINE_RULES = [
+        'display_name'       => ['required','string','max:255'],
+        'display_name_np'    => ['nullable','string','max:255'],
+        'display_name_limbu' => ['nullable','string','max:255'],
+        'gender'             => ['required','in:male,female,other,unknown'],
+        'pusta'              => ['nullable','string','max:255'],
+        'member_type'        => ['nullable','in:दाजुभाइ,दिदीबहिनी,बुहारी'], // MemberType::all()
+        'membership'         => ['nullable','string','max:100'],
+        'birth_date'         => ['nullable','date'],
+        'birth_date_bs'      => ['nullable','string','max:20'],
+        'birth_place'        => ['nullable','string','max:255'],
+        'address'            => ['nullable','string','max:255'],
+        'mobile'             => ['nullable','string','max:50'],
+        'email'              => ['nullable','email','max:255'],
+        'education'          => ['nullable','string','max:255'],
+        'occupation'         => ['nullable','string','max:255'],
+        'registered_by'      => ['nullable','string','max:100'],
+        'death_date'         => ['nullable','date'],
+        'death_place'        => ['nullable','string','max:255'],
+        'death_tithi'        => ['nullable','string','max:50'],
+        'death_reason'       => ['nullable','string','max:255'],
+        'bio'                => ['nullable','string'],
+    ];
+
+    /** Save a single field from the member page (admin inline edit). */
+    public function inlineUpdate(Request $request, Person $person)
+    {
+        $field = (string) $request->input('field');
+        if (!isset(self::INLINE_RULES[$field])) {
+            return response()->json(['message' => 'यो field यहाँबाट सम्पादन गर्न मिल्दैन।'], 422);
+        }
+
+        $value = $request->input('value');
+        $value = is_string($value) ? trim($value) : $value;
+        $value = $value === '' ? null : $value;
+
+        $validator = \Illuminate\Support\Facades\Validator::make([$field => $value], [$field => self::INLINE_RULES[$field]]);
+        if ($validator->fails()) {
+            return response()->json(['message' => $validator->errors()->first($field)], 422);
+        }
+
+        if ($field === 'death_date' && $value && $person->birth_date && \Illuminate\Support\Carbon::parse($value)->lt($person->birth_date)) {
+            return response()->json(['message' => 'मृत्यु मिति जन्म मितिभन्दा अगाडि हुन सक्दैन।'], 422);
+        }
+
+        $changes = [$field => $value];
+        if ($field === 'gender' && $person->member_type === \App\Support\MemberType::forGender($person->gender)) {
+            $changes['member_type'] = \App\Support\MemberType::forGender($value); // automatic type follows gender
+        }
+        if ($field === 'display_name') {
+            // keep given/middle/family names in step, as the full edit form does
+            $request->merge(['display_name' => $value]);
+            $this->mergeNamePartsFromDisplayName($request);
+            $changes += $request->only(['given_name', 'middle_name', 'family_name']);
+        }
+
+        $person->update($changes);
+        $person->refresh();
+
+        $display = match ($field) {
+            'birth_date', 'death_date' => $person->{$field}?->format('Y-m-d'),
+            'gender' => ucfirst($person->gender ?? 'unknown'),
+            default => $person->{$field},
+        };
+
+        return response()->json([
+            'field'   => $field,
+            'value'   => $person->{$field} instanceof \DateTimeInterface ? $person->{$field}->format('Y-m-d') : $person->{$field},
+            'display' => ($display === null || $display === '') ? '-' : (string) $display,
+            'message' => 'सेभ भयो ✓',
+        ]);
     }
 
     public function destroy(Person $person)
@@ -295,7 +369,7 @@ class PersonController extends Controller
             'member_no'        => ['nullable','string','max:50'],
             'display_name_np'  => ['nullable','string','max:255'],
             'display_name_limbu' => ['nullable','string','max:255'],
-            'member_type'      => ['nullable','string','max:100'],
+            'member_type'      => ['nullable', Rule::in(\App\Support\MemberType::all())],
             'membership'       => ['nullable','string','max:100'],
 
             'birth_place'      => ['nullable','string','max:255'],
@@ -319,7 +393,7 @@ class PersonController extends Controller
 
             'registered_by'    => ['nullable','string','max:100'],
             'photo'            => ['nullable','image','mimes:jpeg,jpg,png,webp','max:500'],
-            'birth_order'      => ['nullable','integer','min:1','max:30'],
+            'birth_order'      => ['nullable','integer','min:1','max:' . SiblingOrder::MAX],
         ]);
     }
 
@@ -345,6 +419,11 @@ class PersonController extends Controller
                 $uv['union_spouse_name_np'] ?? null,
                 $uv['union_spouse_name_limbu'] ?? null
             );
+            $details = SpouseDetails::fromInput($uv);
+            if ($request->hasFile('spouse_photo')) {
+                $details['spouse_photo_path'] = self::storePhoto($request->file('spouse_photo'));
+            }
+            SpouseDetails::apply($spouse, $details);
             $spouseId = $spouse->id;
         }
 
@@ -386,6 +465,7 @@ class PersonController extends Controller
             'union_end_date'          => ['nullable','date','after_or_equal:union_start_date'],
             'union_type'              => ['nullable','string','max:50'],
             'union_notes'             => ['nullable','string','max:500'],
+            ...SpouseDetails::rules(), // new spouse: photo, birth, माइती, contact, education
         ]);
 
         if (empty($uv['union_spouse_id']) && trim((string) ($uv['union_spouse_name'] ?? '')) === '') {

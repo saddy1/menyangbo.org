@@ -22,7 +22,16 @@ class RelationshipController extends Controller
         ->paginate(20)
         ->withQueryString();
 
-    return view('admin.relationships.index', compact('edges','q','type'));
+    // ?child_id= / ?parent_id= (e.g. from the tree's "नजोडिएका सदस्य" list) or old input → pre-selected pickers
+    $prefill = [];
+    foreach (['parent_id', 'child_id'] as $key) {
+        $id = (int) old($key, $request->query($key));
+        if ($id && ($p = Person::find($id, ['id', 'display_name', 'display_name_np', 'display_name_limbu', 'member_no', 'pusta', 'gender']))) {
+            $prefill[$key] = $p->only(['id', 'display_name', 'display_name_np', 'display_name_limbu', 'member_no', 'pusta', 'gender']);
+        }
+    }
+
+    return view('admin.relationships.index', compact('edges','q','type','prefill'));
 }
 
     public function searchJson(Request $request)
@@ -122,7 +131,7 @@ class RelationshipController extends Controller
             'child_id'      => ['required','integer','different:parent_id','exists:persons,id'],
             'relation_type' => ['required', Rule::in(['birth','adoption','step','guardianship'])],
             'notes'         => ['nullable','string','max:2000'],
-            'birth_order'   => ['nullable','integer','min:1','max:30'],
+            'birth_order'   => ['nullable','integer','min:1','max:' . SiblingOrder::MAX],
         ]);
         $birthOrder = $data['birth_order'] ?? null;
         unset($data['birth_order']);
@@ -145,11 +154,6 @@ class RelationshipController extends Controller
             if ($min->greaterThan($child->birth_date)) {
                 return back()->withErrors(['child_id'=>'अभिभावक र सन्तान उमेर अन्तर कम्तिमा १२ वर्ष हुनुपर्छ।'])->withInput();
             }
-        }
-
-        // Chosen place must be free among the parent's other children of the same gender
-        if ($birthOrder && $parent && $child && isset(SiblingOrder::taken($parent, $child->gender, $child->id)[(int) $birthOrder])) {
-            return back()->withErrors(['birth_order' => SiblingOrder::assign($parent, $child, (int) $birthOrder)])->withInput();
         }
 
         ParentChildEdge::create($data);
@@ -200,8 +204,8 @@ class RelationshipController extends Controller
         if ($child) {
             $gender = $child->gender ?: 'unknown';
             $taken = SiblingOrder::taken($parent, $gender, $child->id);
-            $options = SiblingOrder::options($gender, $taken);
-            $default = $child->birth_order && !isset($taken[$child->birth_order]) ? $child->birth_order : ($options[0]['value'] ?? null);
+            // default: the child's saved place, else the next number after the existing children
+            $default = $child->birth_order ?: min(SiblingOrder::MAX, ($taken ? max(array_keys($taken)) : 0) + 1);
 
             $payload['child'] = [
                 'id'            => $child->id,
@@ -210,12 +214,94 @@ class RelationshipController extends Controller
                 'relation'      => BirthOrder::relation($gender),
                 'pusta'         => $child->pusta,
                 'pusta_will_be' => $this->isBlank($child->pusta) ? $this->nextPusta($parent->pusta) : null,
-                'options'       => $options,
+                'options'       => SiblingOrder::options(),
                 'default'       => $default,
             ];
         }
 
         return response()->json($payload);
+    }
+
+    /** All children of a parent for the "edit children" panel. */
+    public function children(Person $person)
+    {
+        return response()->json($this->childrenPayload($person));
+    }
+
+    /** Save order / gender / pusta / relation type for several children of one parent at once. */
+    public function updateChildren(Request $request, Person $person)
+    {
+        $data = $request->validate([
+            'children'                 => ['required', 'array'],
+            'children.*.id'            => ['required', 'integer'],
+            'children.*.birth_order'   => ['nullable', 'integer', 'min:1', 'max:' . SiblingOrder::MAX],
+            'children.*.gender'        => ['required', Rule::in(['male', 'female', 'other', 'unknown'])],
+            'children.*.pusta'         => ['nullable', 'string', 'max:255'],
+            'children.*.relation_type' => ['required', Rule::in(['birth', 'adoption', 'step', 'guardianship'])],
+        ]);
+
+        $edges = ParentChildEdge::where('parent_id', $person->id)->get()->keyBy('child_id');
+
+        $nextPusta = $this->nextPusta($person->pusta); // empty pusta → parent + 1 (२८ → २९)
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($data, $edges, $nextPusta) {
+            foreach ($data['children'] as $row) {
+                $edge = $edges[(int) $row['id']] ?? null;
+                if (!$edge) continue; // not a child of this parent
+
+                $edge->update(['relation_type' => $row['relation_type']]);
+                Person::whereKey($edge->child_id)->first()?->update([
+                    'birth_order' => $row['birth_order'] ?? null,
+                    'gender'      => $row['gender'],
+                    'pusta'       => trim((string) ($row['pusta'] ?? '')) === '' ? $nextPusta : trim($row['pusta']),
+                ]);
+            }
+        });
+
+        return response()->json($this->childrenPayload($person->fresh()) + ['message' => 'सन्तानको विवरण सेभ भयो ✓']);
+    }
+
+    private function childrenPayload(Person $parent): array
+    {
+        $children = $parent->children()
+            ->select('persons.id', 'persons.display_name', 'persons.display_name_np', 'persons.gender', 'persons.birth_date',
+                'persons.birth_order', 'persons.member_no', 'persons.pusta')
+            ->withPivot('relation_type')
+            ->get();
+        $ranks = BirthOrder::rank($children);
+        $children = BirthOrder::sortByRank($children, $ranks);
+
+        $ids = $children->pluck('id')->all();
+        $spouseNames = [];
+        foreach (\App\Models\UnionModel::whereIn('spouse1_id', $ids)->orWhereIn('spouse2_id', $ids)->get(['spouse1_id', 'spouse2_id']) as $u) {
+            foreach ([[$u->spouse1_id, $u->spouse2_id], [$u->spouse2_id, $u->spouse1_id]] as [$a, $b]) {
+                if (in_array($a, $ids)) $spouseNames[$a][] = $b;
+            }
+        }
+        $names = Person::whereIn('id', collect($spouseNames)->flatten()->unique())->pluck('display_name', 'id');
+        $spouseNames = array_map(fn ($list) => array_values(array_filter(array_map(fn ($id) => $names[$id] ?? null, $list))), $spouseNames);
+
+        return [
+            'parent' => [
+                'id' => $parent->id,
+                'display_name' => $parent->display_name,
+                'member_no' => $parent->member_no,
+                'pusta' => $parent->pusta,
+                'next_pusta' => $this->nextPusta($parent->pusta),
+            ],
+            'children' => $children->map(fn ($c) => [
+                'id'            => $c->id,
+                'display_name'  => $c->display_name,
+                'display_name_np' => $c->display_name_np,
+                'member_no'     => $c->member_no,
+                'gender'        => $c->gender ?: 'unknown',
+                'pusta'         => $c->pusta,
+                'birth_order'   => $c->birth_order,
+                'rank'          => $ranks[$c->id]['rank'] ?? null,
+                'relation_type' => $c->pivot->relation_type ?: 'birth',
+                'spouses'       => $spouseNames[$c->id] ?? [],
+            ])->values(),
+        ];
     }
 
     /**

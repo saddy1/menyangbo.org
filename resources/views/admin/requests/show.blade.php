@@ -10,7 +10,9 @@ $typeConfig = [
     'add_union'      => ['label'=>'विवाह दर्ता',          'en'=>'Marriage Registration',  'icon'=>'fa-heart',     'hue'=>'rose',   'border'=>'#e11d48','bg'=>'#fff1f2','dot'=>'bg-rose-500'],
     'update_profile' => ['label'=>'प्रोफाइल सम्पादन',    'en'=>'Profile Update',         'icon'=>'fa-pen-to-square','hue'=>'amber','border'=>'#d97706','bg'=>'#fffbeb','dot'=>'bg-amber-500'],
     'not_listed'     => ['label'=>'नयाँ सदस्य',           'en'=>'New Member',             'icon'=>'fa-user-plus', 'hue'=>'purple', 'border'=>'#7c3aed','bg'=>'#faf5ff','dot'=>'bg-purple-500'],
+    'link_parent'    => ['label'=>'अभिभावक जोड्ने',       'en'=>'Link Parent',            'icon'=>'fa-link',      'hue'=>'teal',   'border'=>'#0d9488','bg'=>'#f0fdfa','dot'=>'bg-teal-500'],
 ];
+$linkParent = $r->type === 'link_parent' && !empty($payload['parent_id']) ? \App\Models\Person::find($payload['parent_id']) : null;
 $tc = $typeConfig[$r->type] ?? ['label'=>ucfirst($r->type),'en'=>ucfirst($r->type),'icon'=>'fa-file','hue'=>'gray','border'=>'#9ca3af','bg'=>'#f9fafb','dot'=>'bg-gray-400'];
 
 $payload = (array) $r->payload;
@@ -195,7 +197,13 @@ $fv = function($v) {
           <div class="p-field"><div class="p-label">Gender</div><div class="p-value">{{ $spousePerson->gender ?? '—' }}</div></div>
           <div class="p-field"><div class="p-label">Member No.</div><div class="p-value">{{ $spousePerson->member_no ?? '—' }}</div></div>
         @else
-          @foreach(['spouse_name'=>'नाम (Nepali)','spouse_name_np'=>'Name (English)','spouse_name_limbu'=>'Limbu Name','spouse_gender'=>'Gender','spouse_pusta'=>'Pusta'] as $fk=>$flbl)
+          @if(!empty($payload['spouse_photo_path']))
+            <div class="p-field full"><div class="p-label">Photo</div><div class="p-value"><img src="{{ asset($payload['spouse_photo_path']) }}" alt="" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:1px solid #e5e7eb;"></div></div>
+          @endif
+          @foreach(['spouse_name'=>'नाम (Nepali)','spouse_name_np'=>'Name (English)','spouse_name_limbu'=>'Limbu Name','spouse_gender'=>'Gender','spouse_pusta'=>'Pusta',
+                    'spouse_birth_date'=>'जन्म मिति (A.D.)','spouse_birth_date_bs'=>'जन्म मिति (B.S.)','spouse_birth_place'=>'माइती / जन्मस्थान',
+                    'spouse_father_name'=>'बुबाको नाम','spouse_mother_name'=>'आमाको नाम','spouse_mobile'=>'मोबाइल','spouse_address'=>'ठेगाना',
+                    'spouse_education'=>'शिक्षा','spouse_occupation'=>'पेशा'] as $fk=>$flbl)
             @if(!empty($payload[$fk]))
               <div class="p-field"><div class="p-label">{{ $flbl }}</div><div class="p-value">{{ $payload[$fk] }}</div></div>
             @endif
@@ -209,6 +217,29 @@ $fv = function($v) {
         <div class="p-field"><div class="p-label">Relationship Type</div><div class="p-value">{{ $payload['type'] ?? '—' }}</div></div>
         <div class="p-field"><div class="p-label">Marriage Date</div><div class="p-value">{{ $payload['start_date'] ?? '—' }}</div></div>
         @if(!empty($payload['notes']))<div class="p-field full"><div class="p-label">Notes</div><div class="p-value">{{ $payload['notes'] }}</div></div>@endif
+      </div>
+    </div>
+
+  @elseif($r->type === 'link_parent')
+    <div class="p-section">
+      <div class="p-section-head" style="background:#0f766e;">Child — Current Person</div>
+      <div class="p-grid">
+        <div class="p-field"><div class="p-label">Name</div><div class="p-value">{{ $r->person?->display_name ?? '—' }}</div></div>
+        <div class="p-field"><div class="p-label">Pusta</div><div class="p-value">{{ $r->person?->pusta ?? '—' }}</div></div>
+        <div class="p-field"><div class="p-label">Gender</div><div class="p-value">{{ $r->person?->gender ?? '—' }}</div></div>
+        <div class="p-field"><div class="p-label">Member No.</div><div class="p-value">{{ $r->person?->member_no ?? '—' }}</div></div>
+      </div>
+    </div>
+    <div class="p-section">
+      <div class="p-section-head" style="background:#115e59;">Requested Parent</div>
+      <div class="p-grid">
+        <div class="p-field"><div class="p-label">Name</div><div class="p-value">
+          @if($linkParent)<a href="{{ route('member.page', $linkParent->id) }}" target="_blank" style="color:#0f766e;text-decoration:underline;">{{ $linkParent->display_name }}</a>@else{{ $payload['parent_name'] ?? '—' }} <span style="color:#dc2626;">(deleted)</span>@endif
+        </div></div>
+        <div class="p-field"><div class="p-label">Pusta</div><div class="p-value">{{ $linkParent?->pusta ?? '—' }}</div></div>
+        <div class="p-field"><div class="p-label">Member No.</div><div class="p-value">{{ $linkParent?->member_no ?? '—' }}</div></div>
+        <div class="p-field"><div class="p-label">Relation</div><div class="p-value">{{ ucfirst($payload['relation_type'] ?? 'birth') }}</div></div>
+        @if(!empty($payload['note']))<div class="p-field full"><div class="p-label">Note</div><div class="p-value">{{ $payload['note'] }}</div></div>@endif
       </div>
     </div>
 
@@ -462,6 +493,22 @@ $fv = function($v) {
             @if(!empty($payload['spouse_pusta']))<span class="px-2 py-0.5 bg-rose-50 text-rose-700 rounded-full text-xs font-medium">पुस्ता {{ $payload['spouse_pusta'] }}</span>@endif
             @if(!empty($payload['spouse_gender']))<span class="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full text-xs">{{ $payload['spouse_gender'] }}</span>@endif
           </div>
+          {{-- new-spouse photo and details from the marriage form --}}
+          @if(!empty($payload['spouse_photo_path']))
+            <img src="{{ asset($payload['spouse_photo_path']) }}" alt="" class="mt-3 h-20 w-20 rounded-full object-cover border border-rose-100">
+          @endif
+          @php
+            $spouseExtra = collect(['spouse_birth_date'=>'जन्म मिति (A.D.)','spouse_birth_date_bs'=>'जन्म मिति (B.S.)','spouse_birth_place'=>'माइती / जन्मस्थान',
+                'spouse_father_name'=>'बुबा','spouse_mother_name'=>'आमा','spouse_mobile'=>'मोबाइल','spouse_address'=>'ठेगाना',
+                'spouse_education'=>'शिक्षा','spouse_occupation'=>'पेशा'])->filter(fn($l, $k) => !empty($payload[$k]));
+          @endphp
+          @if($spouseExtra->isNotEmpty())
+            <dl class="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+              @foreach($spouseExtra as $k => $l)
+                <div><dt class="text-gray-400 font-semibold">{{ $l }}</dt><dd class="font-semibold text-gray-800 break-words">{{ $payload[$k] }}</dd></div>
+              @endforeach
+            </dl>
+          @endif
         @endif
       </div>
     </div>
@@ -564,6 +611,30 @@ $fv = function($v) {
     </div>
   </div>
 
+
+  {{-- ── LINK PARENT ── --}}
+  @elseif($r->type === 'link_parent')
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    @foreach([['सन्तान (यो व्यक्ति)', $r->person], ['अभिभावक (जोड्न माग गरिएको)', $linkParent]] as [$cardTitle, $cardPerson])
+    <div class="bg-white rounded-2xl border border-teal-100 shadow-sm p-5">
+      <div class="text-xs font-bold text-teal-600 uppercase tracking-wide mb-2">{{ $cardTitle }}</div>
+      @if($cardPerson)
+        <a href="{{ route('member.page', $cardPerson->id) }}" target="_blank" class="font-bold text-gray-900 hover:text-teal-700">{{ $cardPerson->display_name }}</a>
+        <div class="flex flex-wrap gap-2 mt-1">
+          @if($cardPerson->pusta)<span class="px-2 py-0.5 bg-teal-50 text-teal-700 rounded-full text-xs font-medium">पुस्ता {{ $cardPerson->pusta }}</span>@endif
+          @if($cardPerson->gender)<span class="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full text-xs">{{ $cardPerson->gender }}</span>@endif
+          @if($cardPerson->member_no)<span class="px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full text-xs font-mono">{{ $cardPerson->member_no }}</span>@endif
+        </div>
+      @else
+        <div class="text-rose-600 text-sm">{{ $payload['parent_name'] ?? '—' }} (मेटिएको)</div>
+      @endif
+    </div>
+    @endforeach
+  </div>
+  <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 text-sm">
+    <span class="text-gray-400 font-semibold text-xs">सम्बन्ध:</span> <span class="font-semibold">{{ ucfirst($payload['relation_type'] ?? 'birth') }}</span>
+    @if(!empty($payload['note']))<div class="mt-2"><span class="text-gray-400 font-semibold text-xs">नोट:</span> {{ $payload['note'] }}</div>@endif
+  </div>
 
   @else
   {{-- ── ADD CHILD / NOT LISTED ── --}}

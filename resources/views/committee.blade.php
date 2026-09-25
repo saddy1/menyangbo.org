@@ -1,5 +1,5 @@
 @extends('layouts.app')
-@section('title','कार्यसमिति')
+@section('title',\App\Support\FrontendLocale::text('कार्यसमिति'))
 
 @section('content')
 
@@ -7,28 +7,28 @@
   <!-- Title -->
   <header class="mb-8">
     <h1 class=" text-center text-2xl sm:text-3xl font-extrabold text-blue-700">
-      मेन्याङ्गबो कल्याणकारी संघ नेपाल
+      {{ \App\Support\FrontendLocale::text('मेन्याङ्गबो कल्याणकारी संघ नेपाल') }}
     </h1>
-    <p class="text-center text-slate-600 mt-1">केन्द्रिय कार्यसमितिको नामावली विवरण</p>
+    <p class="text-center text-slate-600 mt-1">{{ \App\Support\FrontendLocale::text('केन्द्रिय कार्यसमितिको नामावली विवरण') }}</p>
   </header>
 
   <!-- Top posts -->
   <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
     <!-- संरक्षक -->
     <article class="rounded-2xl border border-slate-200 bg-white shadow-sm p-5">
-      <h3 class="text-sm font-semibold text-slate-600">संरक्षक</h3>
+      <h3 class="text-sm font-semibold text-slate-600">{{ \App\Support\FrontendLocale::text('संरक्षक') }}</h3>
       <p class="mt-1 text-lg font-bold">श्री पुत्रबहादुर मेन्याङ्बो</p>
     </article>
 
     <!-- अध्यक्ष -->
     <article class="rounded-2xl border border-slate-200 bg-white shadow-sm p-5">
-      <h3 class="text-sm font-semibold text-slate-600">अध्यक्ष</h3>
+      <h3 class="text-sm font-semibold text-slate-600">{{ \App\Support\FrontendLocale::text('अध्यक्ष') }}</h3>
       <p class="mt-1 text-lg font-bold">श्री ललित बहादुर मेन्याङ्बो</p>
     </article>
 
     <!-- उपाध्यक्षहरू -->
     <article class="rounded-2xl border border-slate-200 bg-white shadow-sm p-5">
-      <h3 class="text-sm font-semibold text-slate-600">उपाध्यक्ष</h3>
+      <h3 class="text-sm font-semibold text-slate-600">{{ \App\Support\FrontendLocale::text('उपाध्यक्ष') }}</h3>
       <ul class="mt-1 space-y-1 text-slate-800">
         <li>श्री रमेशकुमार मेन्याइयो</li>
         <li>श्री मनोजकुमार मेन्याङ्बो (विराटनगर)</li>
@@ -37,31 +37,31 @@
 
     <!-- महासचिव / सचिव -->
     <article class="rounded-2xl border border-slate-200 bg-white shadow-sm p-5">
-      <h3 class="text-sm font-semibold text-slate-600">महासचिव</h3>
+      <h3 class="text-sm font-semibold text-slate-600">{{ \App\Support\FrontendLocale::text('महासचिव') }}</h3>
       <p class="mt-1 font-semibold">श्री सुरेन्द्रबहादुर मेन्याङ्बो</p>
-      <h3 class="mt-4 text-sm font-semibold text-slate-600">सचिव</h3>
+      <h3 class="mt-4 text-sm font-semibold text-slate-600">{{ \App\Support\FrontendLocale::text('सचिव') }}</h3>
       <p class="mt-1 font-semibold">श्री शुकराज मेन्याङ्बो</p>
     </article>
 
     <!-- कोषाध्यक्ष / सह-कोषाध्यक्ष -->
     <article class="rounded-2xl border border-slate-200 bg-white shadow-sm p-5">
-      <h3 class="text-sm font-semibold text-slate-600">कोषाध्यक्ष</h3>
+      <h3 class="text-sm font-semibold text-slate-600">{{ \App\Support\FrontendLocale::text('कोषाध्यक्ष') }}</h3>
       <p class="mt-1 font-semibold">श्री मोतिबहादुर मेन्याङ्बो</p>
-      <h3 class="mt-4 text-sm font-semibold text-slate-600">सह-कोषाध्यक्ष</h3>
+      <h3 class="mt-4 text-sm font-semibold text-slate-600">{{ \App\Support\FrontendLocale::text('सह-कोषाध्यक्ष') }}</h3>
       <p class="mt-1 font-semibold">श्री छत्रबहादुर मेन्याङ्बो</p>
     </article>
 
     <!-- कार्यालय / पत्ता -->
     <article class="rounded-2xl border border-slate-200 bg-white shadow-sm p-5">
-      <h3 class="text-sm font-semibold text-slate-600">केन्द्रिय कार्यालय</h3>
-      <p class="mt-1">धरान–१५, सुनसरी, नेपाल</p>
+      <h3 class="text-sm font-semibold text-slate-600">{{ \App\Support\FrontendLocale::text('केन्द्रिय कार्यालय') }}</h3>
+      <p class="mt-1">{{ \App\Support\FrontendLocale::text('धरान–१५, सुनसरी, नेपाल') }}</p>
     </article>
   </div>
 
   <!-- Members -->
   <section class="mt-10">
     <div class="flex items-end justify-between">
-      <h2 class="text-xl font-bold text-blue-700">सदस्य</h2>
+      <h2 class="text-xl font-bold text-blue-700">{{ \App\Support\FrontendLocale::text('सदस्य') }}</h2>
     </div>
 
     <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -92,11 +92,11 @@
 
   <!-- Past leadership -->
   <section class="mt-10">
-    <h2 class="text-xl font-bold text-blue-700">भू. पू. पदाधिकारी</h2>
+    <h2 class="text-xl font-bold text-blue-700">{{ \App\Support\FrontendLocale::text('भू. पू. पदाधिकारी') }}</h2>
 
     <div class="mt-4 grid gap-4 md:grid-cols-2">
       <div class="rounded-2xl border border-slate-200 bg-white shadow-sm p-5">
-        <h3 class="text-sm font-semibold text-slate-600">भू. पू. अध्यक्षहरू</h3>
+        <h3 class="text-sm font-semibold text-slate-600">{{ \App\Support\FrontendLocale::text('भू. पू. अध्यक्षहरू') }}</h3>
         <ul class="mt-2 list-disc ms-5 space-y-1 text-slate-800">
           <li>श्री अकलबहादुर मेन्याङ्गबो</li>
           <li>श्री गणेशबहादुर मेन्याङ्बो</li>
@@ -105,7 +105,7 @@
       </div>
 
       <div class="rounded-2xl border border-slate-200 bg-white shadow-sm p-5">
-        <h3 class="text-sm font-semibold text-slate-600">भू. पू. उपाध्यक्षहरू</h3>
+        <h3 class="text-sm font-semibold text-slate-600">{{ \App\Support\FrontendLocale::text('भू. पू. उपाध्यक्षहरू') }}</h3>
         <ul class="mt-2 list-disc ms-5 space-y-1 text-slate-800">
           <li>श्री ललितबहादुर मेन्याङ्बो</li>
           <li>श्री खड्कबहादुर मेन्याङ्वो</li>
@@ -118,7 +118,7 @@
 
   <!-- Advisors -->
   <section class="mt-10">
-    <h2 class="text-xl font-bold text-blue-700">विशिष्ट सल्लाहकार / कानूनी सल्लाहकार</h2>
+    <h2 class="text-xl font-bold text-blue-700">{{ \App\Support\FrontendLocale::text('विशिष्ट सल्लाहकार / कानूनी सल्लाहकार') }}</h2>
 
     <div class="mt-4 grid gap-4 lg:grid-cols-2">
       <ul class="rounded-2xl border border-slate-200 bg-white shadow-sm p-5 space-y-2 text-slate-800">
@@ -142,7 +142,7 @@
 
   <!-- Central executive list (alternate block you provided) -->
   <section class="mt-10">
-    <h2 class="text-xl font-bold text-blue-700">केन्द्रिय कार्यकारिणि समिति — नामावली</h2>
+    <h2 class="text-xl font-bold text-blue-700">{{ \App\Support\FrontendLocale::text('केन्द्रिय कार्यकारिणि समिति — नामावली') }}</h2>
 
     <div class="mt-4 rounded-2xl border border-slate-200 bg-white shadow-sm p-5">
       <ol class="space-y-2 text-slate-800">
@@ -155,7 +155,7 @@
         <li>७. सह-कोषाध्यक्षः श्रीमान छत्रबहादुर मेन्याङ्ग्बो — धरान, सुनसरी</li>
       </ol>
 
-      <h3 class="mt-5 text-sm font-semibold text-slate-600">सदस्य</h3>
+      <h3 class="mt-5 text-sm font-semibold text-slate-600">{{ \App\Support\FrontendLocale::text('सदस्य') }}</h3>
       <ol class="mt-2 grid gap-1 sm:grid-cols-2">
         <li>८. श्रीमति विनिता मेन्याङ्बो — धरान, सुनसरी</li>
         <li>९. श्रीमति कल्पना मेन्याङ्बो — धरान, सुनसरी</li>

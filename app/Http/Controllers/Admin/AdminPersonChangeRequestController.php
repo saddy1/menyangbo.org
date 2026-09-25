@@ -9,6 +9,8 @@ use App\Models\ParentChildEdge;
 use App\Models\UnionModel;
 use App\Support\MemberNumber;
 use App\Support\SiblingOrder;
+use App\Support\SpouseDetails;
+use App\Support\Lineage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -63,8 +65,7 @@ class AdminPersonChangeRequestController extends Controller
             return back()->with('error', 'A person cannot be married to themselves.');
         }
 
-        $notes = [];
-        DB::transaction(function () use ($r, &$notes) {
+        DB::transaction(function () use ($r) {
 
             $payload = (array)$r->payload;
 
@@ -93,7 +94,7 @@ class AdminPersonChangeRequestController extends Controller
                 // auto pusta if missing
                 if (empty($childData['pusta'])) {
                     $parentPusta = $this->pustaToInt($parent->pusta);
-                    $childData['pusta'] = $parentPusta ? (string)($parentPusta + 1) : null;
+                    $childData['pusta'] = $parentPusta ? \App\Support\BirthOrder::npDigits($parentPusta + 1) : null;
                 }
 
                 $birthOrder = (int) ($childData['birth_order'] ?? 0);
@@ -109,9 +110,27 @@ class AdminPersonChangeRequestController extends Controller
                     'relation_type' => 'birth',
                 ]);
 
-                // Requested सन्तान क्रम; if another child took it meanwhile, it is left for the admin to set
-                if ($birthOrder && ($error = SiblingOrder::assign($parent, $child, $birthOrder))) {
-                    $notes[] = $error;
+                if ($birthOrder) {
+                    SiblingOrder::assign($parent, $child, $birthOrder);
+                }
+            }
+
+            if ($r->type === 'link_parent') {
+                $child = Person::findOrFail($r->person_id);
+                $parent = Person::findOrFail($payload['parent_id'] ?? 0);
+                $problem = Lineage::linkProblem($parent->id, $child->id);
+                if ($problem && !str_contains($problem, 'पहिले नै')) {
+                    throw \Illuminate\Validation\ValidationException::withMessages(['parent_id' => $problem]);
+                }
+                if (!$problem) {
+                    ParentChildEdge::create([
+                        'parent_id'     => $parent->id,
+                        'child_id'      => $child->id,
+                        'relation_type' => $payload['relation_type'] ?? 'birth',
+                    ]);
+                    if (empty($child->pusta) && ($p = $this->pustaToInt($parent->pusta))) {
+                        $child->update(['pusta' => \App\Support\BirthOrder::npDigits($p + 1)]);
+                    }
                 }
             }
 
@@ -133,7 +152,12 @@ class AdminPersonChangeRequestController extends Controller
                 if (!empty($payload['display_name'])) {
                     $payload = array_merge($payload, $this->namePartsFromDisplayName($payload['display_name']));
                 }
+                $birthOrder = (int) ($payload['birth_order'] ?? 0);
+                unset($payload['birth_order']);
                 $person->update($payload);
+                if ($birthOrder && ($parent = SiblingOrder::parentFor($person))) {
+                    SiblingOrder::assign($parent, $person, $birthOrder);
+                }
             }
 
             if ($r->type === 'add_union') {
@@ -151,6 +175,7 @@ class AdminPersonChangeRequestController extends Controller
                         $payload['spouse_name_np']    ?? null,
                         $payload['spouse_name_limbu'] ?? null
                     );
+                    SpouseDetails::apply($spouse, $payload);
                     $spouseId = $spouse->id;
                 }
 
@@ -182,7 +207,7 @@ class AdminPersonChangeRequestController extends Controller
             ]);
         });
 
-        return back()->with('success', trim('Approved. ' . implode(' ', $notes)));
+        return back()->with('success', 'Approved');
     }
 
     public function reject(PersonChangeRequest $r, Request $request)

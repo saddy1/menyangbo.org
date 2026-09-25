@@ -27,7 +27,7 @@ class LoginController extends Controller
 
         if (!Auth::attempt($credentials, $request->boolean('remember'))) {
             return back()->withErrors([
-                'email' => 'इमेल वा पासवर्ड मिलेन।',
+                'email' => __('इमेल वा पासवर्ड मिलेन।'),
             ])->onlyInput('email');
         }
 
@@ -40,9 +40,7 @@ class LoginController extends Controller
 
         $user = Auth::user();
 
-        $fallback = $user->isAdmin() ? route('admin.dashboard') : route('home');
-
-        return redirect()->intended($fallback);
+        return \App\Support\LoginRedirect::for($user);
     }
 
     public function destroy(Request $request)

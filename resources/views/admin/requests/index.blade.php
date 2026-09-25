@@ -23,6 +23,7 @@
                 <option value="add_child"     @selected(request('type')==='add_child')>add_child</option>
                 <option value="update_profile"@selected(request('type')==='update_profile')>update_profile</option>
                 <option value="add_union"     @selected(request('type')==='add_union')>add_union</option>
+                <option value="link_parent"   @selected(request('type')==='link_parent')>link_parent</option>
             </select>
 
             <select name="per_page" class="border rounded-lg px-3 py-2 text-sm">

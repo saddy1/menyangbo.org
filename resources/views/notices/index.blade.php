@@ -1,16 +1,16 @@
 @extends('layouts.app')
-@section('title', 'सूचनाहरू — मेन्याङ्बो कल्याणकारी संघ')
-@section('meta_description', 'मेन्याङ्बो कल्याणकारी संघका सबै सूचनाहरू')
+@section('title', \App\Support\FrontendLocale::text('सूचनाहरू'))
+@section('meta_description', \App\Support\FrontendLocale::text('मेन्याङ्बो कल्याणकारी संघका सबै सूचनाहरू'))
 
 @section('content')
 <div class="mb-5 flex items-center justify-between gap-3">
     <div>
         <div class="flex items-center gap-2 text-xs text-slate-400 mb-1">
-            <a href="{{ route('home') }}" class="hover:text-blue-600">गृहपृष्ठ</a>
+            <a href="{{ \App\Support\FrontendLocale::route('home') }}" class="hover:text-blue-600">{{ \App\Support\FrontendLocale::text('गृहपृष्ठ') }}</a>
             <span>/</span>
-            <span class="text-slate-600 font-medium">सूचनाहरू</span>
+            <span class="text-slate-600 font-medium">{{ \App\Support\FrontendLocale::text('सूचनाहरू') }}</span>
         </div>
-        <h1 class="text-2xl font-extrabold text-slate-900">सूचनाहरू</h1>
+        <h1 class="text-2xl font-extrabold text-slate-900">{{ \App\Support\FrontendLocale::text('सूचनाहरू') }}</h1>
     </div>
     <span class="shrink-0 rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-500">{{ $notices->count() }}</span>
 </div>
@@ -18,12 +18,12 @@
 @if($notices->isEmpty())
 <div class="rounded-2xl border-2 border-dashed border-slate-200 bg-white py-12 text-center">
     <div class="text-4xl mb-3 text-slate-300">🔔</div>
-    <p class="font-semibold text-slate-500">अहिले कुनै सूचना छैन।</p>
+    <p class="font-semibold text-slate-500">{{ \App\Support\FrontendLocale::text('अहिले कुनै सूचना छैन।') }}</p>
 </div>
 @else
 <div class="grid gap-3">
     @foreach($notices as $i => $notice)
-    <a href="{{ route('notices.show', $notice) }}"
+    <a href="{{ \App\Support\FrontendLocale::route('notices.show', $notice) }}"
        class="group rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md hover:border-amber-200 transition overflow-hidden">
         <div class="flex items-stretch">
             <div class="w-1.5 shrink-0" style="background:linear-gradient(180deg,#f59e0b,#ef4444)"></div>
@@ -35,7 +35,7 @@
                     <span class="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700">
                         {{ $notice->display_date_time }}
                     </span>
-                    <span class="text-[11px] font-semibold text-blue-600 opacity-0 group-hover:opacity-100 transition">View notice →</span>
+                    <span class="text-[11px] font-semibold text-blue-600 opacity-0 group-hover:opacity-100 transition">{{ \App\Support\FrontendLocale::text('View notice →') }}</span>
                 </div>
                 <h2 class="font-bold text-slate-800 text-base leading-snug">{{ $notice->title }}</h2>
                 @if($notice->attachment_type === 'image')
@@ -79,7 +79,7 @@
                         <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
                             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 1.5L18.5 9H13V3.5z"/>
                         </svg>
-                        PDF — View inside
+                        {{ \App\Support\FrontendLocale::text('PDF — View inside') }}
                     </div>
                 @endif
                 @if($notice->body)

@@ -224,6 +224,11 @@ class Person extends Model
             throw new \InvalidArgumentException('Death date cannot be before birth date.');
         }
 
+        // सदस्यको प्रकार defaults from gender (दाजुभाइ / दिदीबहिनी); बुहारी is set when a marriage is added
+        if (!trim((string) $p->member_type)) {
+            $p->member_type = \App\Support\MemberType::forGender($p->gender);
+        }
+
         // Ensure display_name is never empty
         if (!trim((string) $p->display_name)) {
             $parts = array_filter([$p->given_name, $p->middle_name, $p->family_name]);

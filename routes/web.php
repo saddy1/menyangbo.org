@@ -37,6 +37,7 @@ use App\Http\Controllers\Admin\CommitteeController as AdminCommitteeController;
    Public pages
 ───────────────────────────────────── */
 Route::get('/', [DashboardController::class, 'home'])->name('home');
+Route::get('/sitemap.xml', \App\Http\Controllers\SitemapController::class)->name('sitemap');
 
 Route::get('/सुझाव', [FeedbackController::class, 'create'])->name('feedback.create');
 Route::post('/सुझाव', [FeedbackController::class, 'store'])->name('feedback.store')->middleware('throttle:10,1');
@@ -98,6 +99,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/person/{person}/request-death', [UserPersonChangeRequestController::class, 'markDeceased'])->name('request.death');
     Route::post('/person/{person}/request-edit', [UserPersonChangeRequestController::class, 'requestProfileUpdate'])->name('request.edit');
     Route::post('/person/{person}/request-marriage', [UserPersonChangeRequestController::class, 'requestMarriage'])->name('request.marriage');
+    Route::post('/person/{person}/request-parent', [UserPersonChangeRequestController::class, 'linkParent'])->name('request.parent');
     Route::post('/person/{person}/upload-photo', [UserPersonChangeRequestController::class, 'uploadPhoto'])->name('person.upload-photo');
     Route::post('/request-not-listed', [UserPersonChangeRequestController::class, 'notListed'])->name('request.notlisted');
     Route::get('/my-requests', [UserPersonChangeRequestController::class, 'myRequests'])->name('my.requests');
@@ -125,6 +127,7 @@ Route::middleware('admin.auth')->prefix('admin')->name('admin.')->group(function
     Route::get('/persons/create', [AdminPersonController::class, 'create'])->name('persons.create');
     Route::post('/persons', [AdminPersonController::class, 'store'])->name('persons.store');
     Route::get('/persons/{person}/edit', [AdminPersonController::class, 'edit'])->name('persons.edit');
+    Route::patch('/persons/{person}/inline', [AdminPersonController::class, 'inlineUpdate'])->name('persons.inline');
     Route::put('/persons/{person}', [AdminPersonController::class, 'update'])->name('persons.update');
     Route::delete('/persons/{person}', [AdminPersonController::class, 'destroy'])->name('persons.destroy');
 
@@ -132,6 +135,8 @@ Route::middleware('admin.auth')->prefix('admin')->name('admin.')->group(function
     Route::get('/relationships/search', [RelationshipController::class, 'searchJson'])->name('relationships.search');
     Route::get('/relationships/preview', [RelationshipController::class, 'preview'])->name('relationships.preview');
     Route::get('/relationships/blocked', [RelationshipController::class, 'blocked'])->name('relationships.blocked');
+    Route::get('/relationships/parent/{person}/children', [RelationshipController::class, 'children'])->name('relationships.children');
+    Route::put('/relationships/parent/{person}/children', [RelationshipController::class, 'updateChildren'])->name('relationships.children.update');
     Route::get('/relationships', [RelationshipController::class, 'index'])->name('relationships.index');
     Route::post('/relationships', [RelationshipController::class, 'store'])->name('relationships.store');
     Route::delete('/relationships/{edge}', [RelationshipController::class, 'destroy'])->name('relationships.destroy');

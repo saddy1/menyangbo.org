@@ -1,9 +1,10 @@
 @extends('layouts.app')
 
-@section('title', 'फोटो ग्यालेरी')
-@section('meta_description', 'मेन्याङ्बो कल्याणकारी संघको फोटो ग्यालेरी')
+@section('title', \App\Support\FrontendLocale::text('फोटो ग्यालेरी'))
+@section('meta_description', \App\Support\FrontendLocale::text('मेन्याङ्बो कल्याणकारी संघको फोटो ग्यालेरी'))
 
 @section('content')
+<h1 class="text-2xl font-bold text-slate-900 mb-6">{{ \App\Support\FrontendLocale::text('फोटो ग्यालेरी') }}</h1>
 @php
     $images = $media->map(fn($img) => [
         'src' => $img->url,
@@ -27,7 +28,7 @@
                         class="mb-3 sm:mb-4 inline-block w-full break-inside-avoid overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:shadow-lg"
                         @click="openLightbox({{ $i }})">
                     <img src="{{ $image->url }}"
-                        alt="{{ $image->name }}"
+                        alt="{{ $image->title ?: pathinfo($image->name, PATHINFO_FILENAME) }}"
                          loading="lazy"
                          class="w-full object-cover transition duration-500 hover:scale-105">
                 </button>
@@ -40,8 +41,8 @@
     @else
         <div class="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
             <div class="text-4xl mb-3 text-slate-300">🖼️</div>
-            <h1 class="font-bold text-slate-700">No photos yet</h1>
-            <p class="text-sm text-slate-400 mt-1">Admin बाट फोटो upload गरेपछि यहाँ देखिनेछ।</p>
+            <h2 class="font-bold text-slate-700">{{ \App\Support\FrontendLocale::text('No photos yet') }}</h2>
+            <p class="text-sm text-slate-400 mt-1">{{ \App\Support\FrontendLocale::text('Admin बाट फोटो upload गरेपछि यहाँ देखिनेछ।') }}</p>
         </div>
     @endif
 
@@ -53,7 +54,7 @@
         <button type="button"
                 class="absolute right-4 top-4 z-20 grid h-10 w-10 place-items-center rounded-full bg-white/10 text-white hover:bg-white/20 transition"
                 @click="closeLightbox()"
-                title="Close">
+                title="{{ \App\Support\FrontendLocale::text('Close') }}">
             <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
             </svg>

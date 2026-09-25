@@ -1,24 +1,9 @@
 @extends('layouts.app')
-@section('title', 'मेयाङ्बो वंशावली — सरल तर विस्तृत')
-@section('meta_description', 'मेन्याङ्बो कल्याणकारी संघको आधिकारिक वेबसाइट — वंशावली, सदस्य सूची, कार्यक्रम र ग्यालेरी')
+@section('title', \App\Support\FrontendLocale::text('मेन्याङ्बो वंशावली'))
+@section('meta_description', \App\Support\FrontendLocale::text('मेन्याङ्बो कल्याणकारी संघको आधिकारिक वेबसाइट — वंशावली, सदस्य सूची, कार्यक्रम र ग्यालेरी'))
 
 @section('content')
-<style>
-.banner-hero-article {
-    height: clamp(180px, 52vw, 320px);
-}
-@media (min-width: 640px) {
-    .banner-hero-article {
-        height: clamp(320px, 58vh, 600px);
-    }
-}
-@media (min-width: 1024px) {
-    .banner-hero-article {
-        height: clamp(480px, 78vh, 880px);
-    }
-}
-</style>
-
+<div class="home-content">
 @php
 $banners    = $homeSections->get('banner',       collect());
 $atAGlance  = $homeSections->get('at_a_glance',  collect());
@@ -41,193 +26,94 @@ $colorMap = [
 ];
 @endphp
 
-{{-- ══════════════════════════════════════════════
-     1. ADMIN CONTROLLED BANNERS (slideshow)
-══════════════════════════════════════════════ --}}
-@if($banners->count())
-@php $sortedBanners = $banners->sortByDesc('created_at')->values(); @endphp
-<section class="mb-8"
-    x-data="{
-        cur: 0,
-        total: {{ $sortedBanners->count() }},
-        _t: null,
-        init() { if (this.total > 1) this._start(); },
-        _start() { this._t = setInterval(() => { this.cur = (this.cur + 1) % this.total; }, 5000); },
-        go(i)   { this.cur = i;                           clearInterval(this._t); this._start(); },
-        prev()  { this.cur = (this.cur - 1 + this.total) % this.total; clearInterval(this._t); this._start(); },
-        next()  { this.cur = (this.cur + 1) % this.total; clearInterval(this._t); this._start(); }
-    }">
-
-    <div class="relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-sm banner-hero-article">
-
-        @foreach($sortedBanners as $i => $banner)
+<section class="home-hero" aria-labelledby="home-heading">
+    <div class="hero-copy">
+        <span class="home-eyebrow"><span></span>{{ __('Our family. Our heritage.') }}</span>
+        <h1 id="home-heading">{{ __('Our roots.') }}<br><em>{{ __('Our shared story.') }}</em></h1>
+        <p>{{ __('Discover the Menyanbo family story, explore generations of connections, and stay close to our community.') }}</p>
+        <div class="hero-actions">
+            <a class="home-button home-button-primary" href="{{ \App\Support\FrontendLocale::route('tree.index') }}">{{ __('Explore the family tree') }}<span aria-hidden="true">↗</span></a>
+            <a class="home-button home-button-secondary" href="{{ \App\Support\FrontendLocale::route('admin.people.directory') }}">{{ __('Member directory') }}<span aria-hidden="true">→</span></a>
+        </div>
+        <div class="hero-note"><span aria-hidden="true">✦</span>{{ __('Preserving our heritage. Connecting generations.') }}</div>
+    </div>
+    @php $heroBanners = $banners->sortByDesc('created_at')->values(); @endphp
+    <div class="hero-visual" x-data="{ current: 0, total: {{ max(1, $heroBanners->count()) }} }">
+        @forelse($heroBanners as $banner)
             @php
-                $bannerUrl = $banner->link_url;
-                $isExternal = $bannerUrl && Str::startsWith($bannerUrl, ['http://', 'https://']);
-                $c = $colorMap[$banner->color ?? 'blue'] ?? $colorMap['blue'];
+                $bannerHasImage = $banner->image_path && (Str::startsWith($banner->image_path, ['https://', 'http://']) || is_file(public_path(ltrim($banner->image_path, '/'))));
             @endphp
-            <div x-show="cur === {{ $i }}"
-                 x-transition:enter="transition ease-in-out duration-700"
-                 x-transition:enter-start="opacity-0"
-                 x-transition:enter-end="opacity-100"
-                 x-transition:leave="transition ease-in-out duration-500"
-                 x-transition:leave-start="opacity-100"
-                 x-transition:leave-end="opacity-0"
-                 class="absolute inset-0"
-                 @if($i > 0) style="display:none" @endif>
-
-                @if($banner->image_path)
-                    <img src="{{ asset($banner->image_path) }}"
-                         alt="{{ $banner->title }}"
-                         class="h-full w-full object-cover">
-                @else
-                    <div class="absolute inset-0 bg-gradient-to-br {{ $c['bar'] }}"></div>
-                    <div class="absolute inset-0 opacity-20"
-                         style="background-image: radial-gradient(circle at 20% 30%, white 0 2px, transparent 3px), radial-gradient(circle at 70% 70%, white 0 2px, transparent 3px); background-size: 44px 44px;"></div>
-                @endif
-
-                <div class="absolute right-3 top-3 z-10 flex max-w-[calc(100%-1.5rem)] items-center gap-2 rounded-full bg-white/80 px-3 py-2 text-xs font-black text-slate-900 shadow-lg ring-1 ring-white/50 backdrop-blur-md sm:right-4 sm:top-4">
-                    <span class="truncate">{{ $banner->title }}</span>
-                    @if($bannerUrl)
-                    <a href="{{ $bannerUrl }}"
-                       @if($isExternal) target="_blank" rel="noopener" @endif
-                       class="inline-flex shrink-0 items-center rounded-full bg-slate-900 px-2.5 py-1 text-[10px] font-black text-white transition hover:bg-blue-700">
-                        {{ $banner->link_label ?: 'Open' }}
-                    </a>
+            <figure class="hero-slide" x-show="current === {{ $loop->index }}" @if(!$loop->first) style="display:none" @endif x-data="{ failed: {{ $bannerHasImage ? 'false' : 'true' }} }">
+                <img src="{{ $bannerHasImage ? asset($banner->image_path) : asset('places/गुफा पोखरी.jpg') }}"
+                     alt="{{ $bannerHasImage ? $banner->title : __('Gupha Pokhari') }}"
+                     x-on:error.once="failed = true; $el.src = @js(asset('places/गुफा पोखरी.jpg')); $el.alt = @js(__('Gupha Pokhari'))"
+                     width="520" height="420" @if($loop->first) fetchpriority="high" @else loading="lazy" @endif>
+                <figcaption>
+                    <span class="hero-photo-eyebrow">{{ __('Places & memories') }}</span>
+                    <strong x-text="failed ? @js(__('Gupha Pokhari')) : @js($banner->title)">{{ $bannerHasImage ? $banner->title : __('Gupha Pokhari') }}</strong>
+                    @if($banner->link_url)
+                        <a href="{{ \App\Support\FrontendLocale::url($banner->link_url) }}" @if(Str::startsWith($banner->link_url, ['http://', 'https://'])) target="_blank" rel="noopener" @endif>{{ $banner->link_label ?: __('Learn more') }} <span aria-hidden="true">↗</span></a>
                     @endif
-                </div>
+                </figcaption>
+            </figure>
+        @empty
+            <figure class="hero-slide">
+                <img src="{{ asset('places/गुफा पोखरी.jpg') }}" alt="{{ __('Gupha Pokhari') }}" width="520" height="420" fetchpriority="high">
+                <figcaption><span class="hero-photo-eyebrow">{{ __('Places & memories') }}</span><strong>{{ __('Gupha Pokhari') }}</strong></figcaption>
+            </figure>
+        @endforelse
+        @if($heroBanners->count() > 1)
+            <div class="hero-slide-controls">
+                <button type="button" @click="current = (current - 1 + total) % total" aria-label="{{ __('Previous slide') }}">←</button>
+                <span x-text="(current + 1) + ' / ' + total" aria-live="polite"></span>
+                <button type="button" @click="current = (current + 1) % total" aria-label="{{ __('Next slide') }}">→</button>
+            </div>
+        @endif
+        <div class="heritage-seal" aria-hidden="true"><img src="{{ asset('menyanbo_logo.png') }}" alt="" width="64" height="64"></div>
+    </div>
+</section>
+
+<section class="home-stats" aria-label="{{ __('Our community in numbers') }}">
+    <div class="home-stat-grid">
+        @foreach(['people' => 'कुल सदस्य', 'generations' => 'पुस्ता', 'unions' => 'परिवार', 'deceased' => 'दिवंगत'] as $key => $label)
+            <div class="home-stat">
+                <span class="stat-index" aria-hidden="true">{{ \App\Support\FrontendLocale::number(str_pad($loop->iteration, 2, '0', STR_PAD_LEFT)) }}</span>
+                <strong>{{ \App\Support\FrontendLocale::number(number_format($stats[$key])) }}</strong>
+                <span>{{ \App\Support\FrontendLocale::text($label) }}</span>
             </div>
         @endforeach
-
-        {{-- Prev / Next arrows (multi-banner only) --}}
-        @if($sortedBanners->count() > 1)
-        <button @click="prev()"
-                class="absolute left-2 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full bg-black/30 hover:bg-black/55 text-white flex items-center justify-center backdrop-blur-sm transition-all sm:left-3">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
-            </svg>
-        </button>
-        <button @click="next()"
-                class="absolute right-2 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full bg-black/30 hover:bg-black/55 text-white flex items-center justify-center backdrop-blur-sm transition-all sm:right-3">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
-            </svg>
-        </button>
-
-        {{-- Dot indicators --}}
-        <div class="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5">
-            @foreach($sortedBanners as $i => $banner)
-            <button @click="go({{ $i }})"
-                    class="rounded-full transition-all duration-300"
-                    :class="cur === {{ $i }} ? 'w-5 h-2 bg-white shadow' : 'w-2 h-2 bg-white/50 hover:bg-white/80'">
-            </button>
-            @endforeach
-        </div>
-        @endif
-
     </div>
-</section>
-@endif
-
-
-{{-- ══════════════════════════════════════════════
-     3. STATISTICS
-══════════════════════════════════════════════ --}}
-<section class="mb-10">
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 text-center hover:shadow-md transition-shadow">
-            <div class="text-3xl font-extrabold text-blue-600 mb-1">{{ number_format($stats['people']) }}</div>
-            <div class="text-sm font-semibold text-slate-700">कुल सदस्य</div>
-            <div class="text-xs text-slate-400 mt-0.5">Total Members</div>
-            <div class="mt-2 flex items-center justify-center gap-2 text-[11px] font-semibold text-slate-500">
-                <span class="text-blue-600">{{ number_format($stats['male']) }} Male</span>
-                <span class="text-slate-300">|</span>
-                <span class="text-pink-600">{{ number_format($stats['female']) }} Female</span>
-            </div>
-        </div>
-        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 text-center hover:shadow-md transition-shadow">
-            <div class="text-3xl font-extrabold text-emerald-600 mb-1">{{ number_format($stats['generations']) }}</div>
-            <div class="text-sm font-semibold text-slate-700">पुस्ता</div>
-            <div class="text-xs text-slate-400 mt-0.5">Generations</div>
-        </div>
-        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 text-center hover:shadow-md transition-shadow">
-            <div class="text-3xl font-extrabold text-amber-600 mb-1">{{ number_format($stats['unions']) }}</div>
-            <div class="text-sm font-semibold text-slate-700">परिवार</div>
-            <div class="text-xs text-slate-400 mt-0.5">Families</div>
-        </div>
-        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 text-center hover:shadow-md transition-shadow">
-            <div class="text-3xl font-extrabold text-rose-500 mb-1">{{ number_format($stats['deceased']) }}</div>
-            <div class="text-sm font-semibold text-slate-700">दिवंगत</div>
-            <div class="text-xs text-slate-400 mt-0.5">Deceased</div>
-        </div>
-    </div>
-
-    <div class="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div class="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-center">
-            <div class="text-xl font-extrabold text-blue-700">{{ number_format($stats['male']) }}</div>
-            <div class="text-xs font-semibold text-blue-700/70">पुरुष / Male</div>
-        </div>
-        <div class="rounded-xl border border-pink-100 bg-pink-50 px-4 py-3 text-center">
-            <div class="text-xl font-extrabold text-pink-700">{{ number_format($stats['female']) }}</div>
-            <div class="text-xs font-semibold text-pink-700/70">महिला / Female</div>
-        </div>
-        <div class="rounded-xl border border-purple-100 bg-purple-50 px-4 py-3 text-center">
-            <div class="text-xl font-extrabold text-purple-700">{{ number_format($stats['other']) }}</div>
-            <div class="text-xs font-semibold text-purple-700/70">अन्य / Other</div>
-        </div>
-        <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-center">
-            <div class="text-xl font-extrabold text-slate-700">{{ number_format($stats['unknown']) }}</div>
-            <div class="text-xs font-semibold text-slate-500">Unknown</div>
-        </div>
+    <div class="home-demographics">
+        <span class="demographics-label">{{ __('Our community') }}</span>
+        @foreach(['male' => 'Male', 'female' => 'Female', 'other' => 'Other', 'unknown' => 'Unknown'] as $key => $label)
+            <span class="demographic-item"><i class="demographic-dot demographic-{{ $key }}" aria-hidden="true"></i><strong>{{ \App\Support\FrontendLocale::number(number_format($stats[$key])) }}</strong><span>{{ \App\Support\FrontendLocale::text($label) }}</span></span>
+        @endforeach
     </div>
 </section>
 
-{{-- ══════════════════════════════════════════════
-     4. QUICK ACTIONS
-══════════════════════════════════════════════ --}}
-<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-10">
-    <a href="{{ route('tree.index') }}"
-       class="group rounded-2xl border border-slate-200 bg-white shadow-sm p-5 flex flex-col items-center gap-2 hover:shadow-lg hover:-translate-y-1 transition-all text-center">
-        <span class="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 group-hover:bg-emerald-100 transition-colors">
-            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-        </span>
-        <span class="font-semibold text-slate-700 text-sm">वंशावली Tree</span>
-        <span class="text-[11px] text-slate-400">परिवार वृक्ष हेर्नुहोस्</span>
-    </a>
-    <a href="{{ route('admin.people.directory') }}"
-       class="group rounded-2xl border border-slate-200 bg-white shadow-sm p-5 flex flex-col items-center gap-2 hover:shadow-lg hover:-translate-y-1 transition-all text-center">
-        <span class="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 group-hover:bg-blue-100 transition-colors">
-            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-        </span>
-        <span class="font-semibold text-slate-700 text-sm">सदस्य सूची</span>
-        <span class="text-[11px] text-slate-400">पारिवारिक निर्देशिका</span>
-    </a>
-    <a href="{{ route('committee.index') }}"
-       class="group rounded-2xl border border-slate-200 bg-white shadow-sm p-5 flex flex-col items-center gap-2 hover:shadow-lg hover:-translate-y-1 transition-all text-center">
-        <span class="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600 group-hover:bg-amber-100 transition-colors">
-            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
-        </span>
-        <span class="font-semibold text-slate-700 text-sm">कार्यसमिति</span>
-        <span class="text-[11px] text-slate-400">समिति सदस्यहरू</span>
-    </a>
-    <a href="{{ route('feedback.create') }}"
-       class="group rounded-2xl border border-slate-200 bg-white shadow-sm p-5 flex flex-col items-center gap-2 hover:shadow-lg hover:-translate-y-1 transition-all text-center">
-        <span class="w-12 h-12 rounded-xl bg-rose-50 flex items-center justify-center text-rose-600 group-hover:bg-rose-100 transition-colors">
-            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
-        </span>
-        <span class="font-semibold text-slate-700 text-sm">सुझाव</span>
-        <span class="text-[11px] text-slate-400">मत / प्रतिक्रिया</span>
-    </a>
-</div>
+<section class="home-explore" aria-labelledby="explore-heading">
+    <div class="home-section-heading"><div><span class="home-eyebrow">{{ __('A place to belong') }}</span><h2 id="explore-heading">{{ __('Explore your community') }}</h2></div><p>{{ __('Your family, history, and community — all in one place.') }}</p></div>
+    <div class="home-shortcuts">
+        @foreach([
+            ['tree.index', 'वंशावली', 'Explore family connections', 'M6 6h12M6 6v4m12-4v4M12 3v3M4 10h4v4H4zm12 0h4v4h-4zM10 17h4v4h-4zm-4-3v5h4'],
+            ['admin.people.directory', 'सदस्य सूची', 'Find people in our family', 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M16 3a4 4 0 0 1 0 8m6 10v-2a4 4 0 0 0-3-3.87M13 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0'],
+            ['committee.index', 'कार्यसमिति', 'Meet the people serving us', 'M12 3l9 5-9 5-9-5 9-5zm-9 9 9 5 9-5M3 16l9 5 9-5'],
+            ['feedback.create', 'सुझाव', 'Share a thought or suggestion', 'M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5z']
+        ] as [$destination, $label, $description, $icon])
+            <a class="home-shortcut" href="{{ \App\Support\FrontendLocale::route($destination) }}">
+                <div class="shortcut-top"><span class="shortcut-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ $icon }}"/></svg></span><span class="shortcut-arrow" aria-hidden="true">↗</span></div>
+                <h3>{{ \App\Support\FrontendLocale::text($label) }}</h3><p>{{ __($description) }}</p>
+            </a>
+        @endforeach
+    </div>
+</section>
 
-{{-- ══════════════════════════════════════════════
-     5. EVENTS
-══════════════════════════════════════════════ --}}
+
 @if($events->count())
-<section class="mb-10">
-    <h2 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-        <span class="inline-block w-1 h-5 bg-blue-600 rounded-full"></span>
-        कार्यक्रम / सूचनाहरू
+<section class="home-data-section">
+    <h2 class="home-data-heading">
+        <span class="section-mark"></span>
+        {{ \App\Support\FrontendLocale::text('कार्यक्रम / सूचनाहरू') }}
     </h2>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         @foreach($events as $event)
@@ -269,16 +155,16 @@ $colorMap = [
      6. GALLERY (from Media model — saves to public/media/)
 ══════════════════════════════════════════════ --}}
 @if($gallery->count())
-<section class="mb-10">
-    <h2 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-        <span class="inline-block w-1 h-5 bg-blue-600 rounded-full"></span>
-        फोटो ग्यालेरी
+<section class="home-data-section">
+    <h2 class="home-data-heading">
+        <span class="section-mark"></span>
+        {{ \App\Support\FrontendLocale::text('फोटो ग्यालेरी') }}
     </h2>
     <div class="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
         @foreach($gallery as $photo)
         <figure class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden hover:shadow-md transition-shadow">
             <div class="aspect-video bg-slate-100">
-                <img src="{{ asset($photo->file_path) }}" alt="{{ $photo->name ?? '' }}" class="h-full w-full object-cover">
+                <img src="{{ $photo->url }}" alt="{{ $photo->title ?: $photo->name }}" loading="lazy" class="h-full w-full object-cover">
             </div>
             @if($photo->category)
             <figcaption class="text-xs text-slate-600 px-3 py-2 leading-snug">{{ $photo->category }}</figcaption>
@@ -287,9 +173,9 @@ $colorMap = [
         @endforeach
     </div>
     <div class="mt-4 flex justify-center">
-        <a href="{{ route('gallery.index') }}"
+        <a href="{{ \App\Support\FrontendLocale::route('gallery.index') }}"
            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 transition-colors shadow-sm">
-            थप फोटोहरू हेर्नुहोस्
+            {{ \App\Support\FrontendLocale::text('थप फोटोहरू हेर्नुहोस्') }}
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
             </svg>
@@ -302,10 +188,10 @@ $colorMap = [
      7. एक नजरमा  (DB-driven)
 ══════════════════════════════════════════════ --}}
 @if($atAGlance->count())
-<section class="mb-10">
-    <h2 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-        <span class="inline-block w-1 h-5 bg-blue-600 rounded-full"></span>
-        एक नजरमा
+<section class="home-data-section">
+    <h2 class="home-data-heading">
+        <span class="section-mark"></span>
+        {{ \App\Support\FrontendLocale::text('एक नजरमा') }}
     </h2>
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         @foreach($atAGlance as $item)
@@ -322,10 +208,10 @@ $colorMap = [
      8. घटनाक्रम  (DB-driven)
 ══════════════════════════════════════════════ --}}
 @if($timeline->count())
-<section class="mb-10">
-    <h2 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-        <span class="inline-block w-1 h-5 bg-blue-600 rounded-full"></span>
-        मुख्य घटनाक्रम
+<section class="home-data-section">
+    <h2 class="home-data-heading">
+        <span class="section-mark"></span>
+        {{ \App\Support\FrontendLocale::text('मुख्य घटनाक्रम') }}
     </h2>
     <ol class="relative border-s-2 border-slate-200 ps-6 space-y-4">
         @foreach($timeline as $event)
@@ -357,16 +243,16 @@ $colorMap = [
      9. प्रमुख व्यक्तित्व  (DB-driven)
 ══════════════════════════════════════════════ --}}
 @if($keyFigures->count())
-<section class="mb-10">
-    <h2 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-        <span class="inline-block w-1 h-5 bg-blue-600 rounded-full"></span>
-        प्रमुख व्यक्तित्व
+<section class="home-data-section">
+    <h2 class="home-data-heading">
+        <span class="section-mark"></span>
+        {{ \App\Support\FrontendLocale::text('प्रमुख व्यक्तित्व') }}
     </h2>
     <div class="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
         @foreach($keyFigures as $figure)
         @php $c = $colorMap[$figure->color ?? 'default'] ?? $colorMap['default']; @endphp
         <article class="rounded-2xl border border-slate-200 bg-white shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all overflow-hidden">
-            <div class="h-1.5 bg-gradient-to-r {{ $c['bar'] }}"></div>
+            <div class="figure-accent"></div>
             <div class="px-4 pt-4 pb-3 flex items-start gap-3">
                 <span class="shrink-0 grid place-items-center w-10 h-10 rounded-xl {{ $c['bg'] }} ring-1 {{ $c['ring'] }}">
                     <svg class="w-5 h-5 {{ $c['icon'] }}" viewBox="0 0 24 24" fill="currentColor">
@@ -381,7 +267,7 @@ $colorMap = [
                 </div>
             </div>
             @if($figure->body)
-            <p class="text-xs text-slate-600 px-4 pb-4 leading-relaxed">{{ $figure->body }}</p>
+            <p class="text-sm text-slate-600 px-4 pb-4 leading-relaxed">{{ $figure->body }}</p>
             @endif
         </article>
         @endforeach
@@ -395,10 +281,10 @@ $colorMap = [
      11. नोटहरू  (DB-driven)
 ══════════════════════════════════════════════ --}}
 @if($notes->count())
-<section class="mb-10">
-    <h2 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-        <span class="inline-block w-1 h-5 bg-blue-600 rounded-full"></span>
-        बसोबास/प्रसार र नोटहरू
+<section class="home-data-section">
+    <h2 class="home-data-heading">
+        <span class="section-mark"></span>
+        {{ \App\Support\FrontendLocale::text('बसोबास/प्रसार र नोटहरू') }}
     </h2>
 
     @php
@@ -450,17 +336,19 @@ $colorMap = [
             </svg>
         </div>
         <div class="min-w-0 flex-1">
-            <h3 class="font-semibold text-slate-800 text-sm">मुन्‍धुम अनुसार सृष्टिको पहिलो मानव</h3>
-            <p class="text-xs text-slate-500 mt-0.5">शिक्षण/सन्दर्भका लागि उपयोगी पूरा कागजात।</p>
+            <h3 class="font-semibold text-slate-800 text-sm">{{ \App\Support\FrontendLocale::text('मुन्‍धुम अनुसार सृष्टिको पहिलो मानव') }}</h3>
+            <p class="text-xs text-slate-500 mt-0.5">{{ \App\Support\FrontendLocale::text('शिक्षण/सन्दर्भका लागि उपयोगी पूरा कागजात।') }}</p>
         </div>
         <a href="{{ asset('मुन्धुम अनुसार सृष्टिको पहिलो मानव.pdf') }}"
            class="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 text-white font-semibold text-xs hover:bg-emerald-700 transition-colors shadow">
-            हेर्नुहोस्
+            {{ \App\Support\FrontendLocale::text('हेर्नुहोस्') }}
             <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M14 3l7 7-7 7v-4H3v-6h11V3z"/></svg>
         </a>
     </div>
 </section>
 @endif
+
+</div>
 
 {{-- ══════════════════════════════════════════════
      POPUP MODAL (PostEvent show_popup, once per session)
@@ -484,7 +372,7 @@ $colorMap = [
             <p class="text-sm text-slate-600 mt-3 leading-relaxed">{{ $popup->description }}</p>
             @endif
             <button onclick="closePopup()" class="mt-5 w-full py-2.5 rounded-xl bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 transition-colors">
-                बन्द गर्नुहोस्
+                {{ \App\Support\FrontendLocale::text('बन्द गर्नुहोस्') }}
             </button>
         </div>
     </div>
@@ -627,7 +515,7 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
          x-transition:leave-end="opacity-0 scale-95">
 
         {{-- Close button --}}
-        <button @click="close()" class="popup-close" aria-label="Close">
+        <button @click="close()" class="popup-close" aria-label="{{ \App\Support\FrontendLocale::text('Close') }}">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
             </svg>
@@ -680,7 +568,7 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
                     @if($notice->link_url)
                     <a href="{{ $notice->link_url }}" target="_blank" rel="noopener"
                        class="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold border border-white/20 flex items-center gap-1.5 transition">
-                        Open
+                        {{ \App\Support\FrontendLocale::text('Open') }}
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
                         </svg>
@@ -688,7 +576,7 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
                     @endif
                     <button @click.prevent="next()"
                             class="px-4 py-2 rounded-xl bg-[#e2a024] hover:bg-[#f5c355] text-[#0b2415] text-xs font-bold flex items-center gap-1.5 transition">
-                        <span x-text="currentIndex < total - 1 ? 'Next →' : 'Close'"></span>
+                        <span x-text="currentIndex < total - 1 ? @js(\App\Support\FrontendLocale::text('Next →')) : @js(\App\Support\FrontendLocale::text('Close'))"></span>
                     </button>
                 </div>
             </div>

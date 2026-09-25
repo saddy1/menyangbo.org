@@ -16,3 +16,18 @@ yarn-error.log
 /.fleet
 /.idea
 /.vscode
+
+# Uploaded content — lives only on the server, never in git (deploy/deploy.sh never touches it)
+/public/photos/*
+!/public/photos/.gitkeep
+/public/notices
+/public/events
+/public/committee-photos
+/public/banners
+/public/media
+/public/popups
+
+# stray archives / backups
+*.tar.gz
+*.sql
+*.sql.gz

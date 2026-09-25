@@ -21,7 +21,11 @@ class RedirectIfAuthenticated
 
         foreach ($guards as $guard) {
             if (Auth::guard($guard)->check()) {
-                return redirect()->intended(RouteServiceProvider::HOME);
+                // already logged in (e.g. opened /login again): admins → dashboard
+                $user = Auth::guard($guard)->user();
+                return $user instanceof \App\Models\User
+                    ? \App\Support\LoginRedirect::for($user)
+                    : redirect()->intended(RouteServiceProvider::HOME);
             }
         }
 
