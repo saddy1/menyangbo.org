@@ -48,6 +48,7 @@ Route::get('/tree-json', [TreeController::class, 'treeJson'])->name('tree.json')
 Route::get('/tree-unconnected', [TreeController::class, 'unconnected'])->name('tree.unconnected');
 Route::get('/people/search', [TreeController::class, 'searchPeople'])->name('people.search');
 Route::get('/people/first-by-pusta', [TreeController::class, 'firstPersonByPusta'])->name('people.firstByPusta');
+Route::get('/people/by-pusta', [TreeController::class, 'peopleByPusta'])->name('people.byPusta');
 Route::get('/person/{person}', [TreeController::class, 'personShow'])->name('person.show');
 Route::get('/कार्यसमिति', [CommitteeController::class, 'index'])->name('committee.index');
 Route::get('/member/{person}', [TreeController::class, 'memberPage'])->name('member.page');

@@ -111,10 +111,47 @@ public function memberPage(Person $person)
             ->pluck('pusta')
             ->values();
 
+        $pustaNums = $pustas->map(fn ($v) => self::pustaNumber($v))->filter()->unique()->sort()->values();
+
         return view('tree.simple', [
-            'rootId' => $rootId,
-            'pustas' => $pustas,
+            'rootId'    => $rootId,
+            'pustas'    => $pustas,
+            'pustaNums' => $pustaNums,
         ]);
+    }
+
+    /** "२६" / " २६" / "26" → 26 */
+    private static function pustaNumber($value): ?int
+    {
+        $s = strtr(trim((string) $value), ['०'=>'0','१'=>'1','२'=>'2','३'=>'3','४'=>'4','५'=>'5','६'=>'6','७'=>'7','८'=>'8','९'=>'9']);
+        return ctype_digit($s) && $s !== '' ? (int) $s : null;
+    }
+
+    /** Everyone in one pusta (for the "start from person" picker), with father name to tell them apart */
+    public function peopleByPusta(Request $request)
+    {
+        $pusta = (int) $request->query('pusta');
+        if ($pusta < 1) return response()->json([]);
+
+        $rows = Person::query()
+            ->whereNotNull('pusta')
+            ->with(['parents:id,display_name,gender'])
+            ->select('id', 'display_name', 'display_name_np', 'member_no', 'gender', 'pusta')
+            ->get()
+            ->filter(fn ($p) => self::pustaNumber($p->pusta) === $pusta);
+
+        return response()->json($rows->map(fn ($p) => [
+            'id'          => (string) $p->id,
+            'name'        => $p->display_name,
+            'name_np'     => $p->display_name_np && $p->display_name_np !== $p->display_name ? $p->display_name_np : null,
+            'member_no'   => $p->member_no,
+            'gender'      => $p->gender ?: 'unknown',
+            'father_name' => optional($p->parents->firstWhere('gender', 'male') ?? $p->parents->first())->display_name,
+            'has_parent'  => $p->parents->isNotEmpty(),
+        ])
+        // blood members first (married-in spouses last), then by name
+        ->sortBy(fn ($r) => [$r['has_parent'] ? 0 : 1, $r['name']])
+        ->values());
     }
 
     /** Search by ID / Nepali name / English name + optional pusta filter */
@@ -347,9 +384,11 @@ public function memberPage(Person $person)
     {
         $rootId = (int)($request->query('root_id') ?: 0);
         $depth  = (int)($request->query('depth') ?: 5);
-        if (!in_array($depth, [2,5,10,15,20,30], true)) {
+        if ($depth < 1 || $depth > 60) {
             $depth = 5;
         }
+        // Start N generations above the chosen person (From पुस्ता → To पुस्ता)
+        $up = max(0, min(60, (int)$request->query('up', 0)));
 
         if (!$rootId) {
             $rootId = (int)(Person::query()->orderBy('id')->value('id') ?? 0);
@@ -371,6 +410,18 @@ public function memberPage(Person $person)
         $childrenByParent = [];
         foreach ($edges as $e) {
             $childrenByParent[(int)$e->parent_id][] = (int)$e->child_id;
+        }
+
+        if ($up > 0) {
+            $parentsByChild = [];
+            foreach ($edges as $e) $parentsByChild[(int)$e->child_id][] = (int)$e->parent_id;
+            for ($i = 0; $i < $up; $i++) {
+                $ps = $parentsByChild[$rootId] ?? [];
+                if (!$ps) break;
+                // follow the father's line first
+                usort($ps, fn ($a, $b) => (($people[$b]->gender ?? null) === 'male') <=> (($people[$a]->gender ?? null) === 'male'));
+                $rootId = $ps[0];
+            }
         }
 
         // Sort children by birth_date then id

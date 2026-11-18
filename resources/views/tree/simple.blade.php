@@ -272,9 +272,9 @@
 
             <div class="flex items-center gap-2 text-sm text-slate-700">
                 <span>{{ \App\Support\FrontendLocale::text('Tree level :') }}</span>
-                <select class="border rounded-lg px-2 py-1" x-model="depth" @change="reload()">
-                    <template x-for="d in [2,5,10,15,20,30]" :key="d">
-                        <option :value="d" x-text="d"></option>
+                <select class="border rounded-lg px-2 py-1" @change="depth = +$event.target.value; reload()">
+                    <template x-for="d in depthOptions()" :key="d">
+                        <option :value="d" x-text="d" :selected="d === +depth"></option>
                     </template>
                 </select>
             </div>
@@ -343,6 +343,58 @@
             </div>
             <div class="text-xs text-slate-300">
                 {{ \App\Support\FrontendLocale::text('Uses current root, selected level, photos, spouses, and compact tree layout.') }}
+            </div>
+            <div class="w-full flex flex-wrap items-end gap-3 rounded-xl bg-white/5 border border-white/10 px-3 py-3">
+                <label class="flex flex-col gap-1">
+                    <span class="text-[11px] font-bold uppercase tracking-wide text-emerald-300">1 · {{ \App\Support\FrontendLocale::text('From पुस्ता') }}</span>
+                    <select @change="setRangeFrom(+$event.target.value)"
+                        class="rounded-lg border border-white/10 bg-white/10 px-2 py-2 text-sm font-bold text-white min-w-[80px]">
+                        <template x-for="p in allPustas" :key="p">
+                            <option class="text-slate-900" :value="p" x-text="npDigits(p)" :selected="p === rangeFrom"></option>
+                        </template>
+                    </select>
+                </label>
+
+                <div class="flex flex-col gap-1 min-w-[260px] flex-1 max-w-[460px]">
+                    <span class="text-[11px] font-bold uppercase tracking-wide text-emerald-300">
+                        2 · {{ \App\Support\FrontendLocale::text('Start from person') }}
+                        <span class="normal-case font-normal text-slate-300" x-text="rangeLoading ? '…' : '(' + rangePeople.length + ')'"></span>
+                    </span>
+                    <div class="flex gap-2">
+                        <input type="text" x-model="rangeFilter" x-show="rangePeople.length > 8"
+                            placeholder="{{ \App\Support\FrontendLocale::text('Filter name…') }}"
+                            aria-label="{{ \App\Support\FrontendLocale::text('Filter name…') }}"
+                            class="w-32 rounded-lg border border-white/10 bg-white/10 px-2 py-2 text-sm text-white placeholder-slate-400">
+                        <select @change="rangePersonId = $event.target.value" aria-label="{{ \App\Support\FrontendLocale::text('Start from person') }}"
+                            class="flex-1 min-w-0 rounded-lg border border-white/10 bg-white/10 px-2 py-2 text-sm font-semibold text-white">
+                            <template x-if="rangeAncestorOption()">
+                                <option class="text-slate-900" value="auto" :selected="rangePersonId === 'auto'" x-text="rangeAncestorOption()"></option>
+                            </template>
+                            <template x-if="!rangeAncestorOption() && !rangePersonId">
+                                <option class="text-slate-900" value="" selected>— {{ \App\Support\FrontendLocale::text('choose a person') }} —</option>
+                            </template>
+                            <template x-for="r in filteredRangePeople()" :key="r.id">
+                                <option class="text-slate-900" :value="r.id" :selected="r.id === rangePersonId" x-text="rangePersonLabel(r)"></option>
+                            </template>
+                        </select>
+                    </div>
+                </div>
+
+                <label class="flex flex-col gap-1">
+                    <span class="text-[11px] font-bold uppercase tracking-wide text-emerald-300">3 · {{ \App\Support\FrontendLocale::text('To पुस्ता') }}</span>
+                    <select @change="rangeTo = +$event.target.value"
+                        class="rounded-lg border border-white/10 bg-white/10 px-2 py-2 text-sm font-bold text-white min-w-[80px]">
+                        <template x-for="p in toOptions()" :key="p">
+                            <option class="text-slate-900" :value="p" x-text="npDigits(p)" :selected="p === rangeTo"></option>
+                        </template>
+                    </select>
+                </label>
+
+                <button type="button" @click="applyRange()" :disabled="!rangePersonId"
+                    class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-sm font-bold">
+                    {{ \App\Support\FrontendLocale::text('Show tree') }}
+                </button>
+                <span class="text-xs text-slate-300 pb-2" x-text="rangeText()"></span>
             </div>
             <div class="ml-auto flex flex-wrap items-center gap-2">
                 <select x-model="exportPaper" class="rounded-lg border border-white/10 bg-white/10 px-2 py-2 text-xs font-bold text-white">
@@ -676,6 +728,15 @@
             customWidthMm: 1500,
             customHeightMm: 900,
             treeRootData: null,
+            rangeFrom: null,
+            rangeTo: null,
+            rangeNote: '',
+            allPustas: @json($pustaNums ?? []),
+            rangePeople: [],
+            rangePersonId: '',
+            rangeFilter: '',
+            rangeLoading: false,
+            _rangeListFor: null,
 
             // search
             results:    [],
@@ -814,14 +875,115 @@
             /* ═══════════════════════════════
                DATA / DRAW
             ═══════════════════════════════ */
-            async reload() {
+            async reload(up = 0) {
                 const url = new URL(@json(\App\Support\FrontendLocale::route('tree.json')), window.location.origin);
                 url.searchParams.set('root_id', this.rootId);
                 url.searchParams.set('depth',   this.depth);
+                if (up > 0) url.searchParams.set('up', up);
                 const res  = await fetch(url);
                 const data = await res.json();
+                if (data?.id) this.rootId = parseInt(data.id);
                 this.draw(data);
-                if (data?.pusta) this.currentPusta = String(data.pusta);
+                this.currentPusta = data?.pusta ? String(data.pusta).trim() : null;
+                const p = this.rootPustaNum();
+                if (p) {
+                    this.rangeFrom = p;
+                    this.rangeTo = p + (+this.depth) - 1;
+                    this.rangePersonId = String(this.rootId);
+                    if (this._rangeListFor !== p) this.loadRangePeople(p);
+                }
+            },
+
+            async loadRangePeople(p) {
+                this._rangeListFor = p;
+                this.rangeLoading = true;
+                this.rangeFilter = '';
+                try {
+                    const url = new URL(@json(\App\Support\FrontendLocale::route('people.byPusta')), window.location.origin);
+                    url.searchParams.set('pusta', p);
+                    const rows = await (await fetch(url)).json();
+                    if (this._rangeListFor === p) {
+                        this.rangePeople = Array.isArray(rows) ? rows : [];
+                        if (!this.rangePersonId && this.rangePeople.length === 1) this.rangePersonId = this.rangePeople[0].id;
+                    }
+                } finally {
+                    this.rangeLoading = false;
+                }
+            },
+            setRangeFrom(p) {
+                this.rangeFrom = p;
+                if (this.rangeTo < p) this.rangeTo = p;
+                const cur = this.rootPustaNum();
+                // same pusta → keep current person; earlier pusta → their ancestor; otherwise pick a person
+                this.rangePersonId = p === cur ? String(this.rootId) : (cur && p < cur ? 'auto' : '');
+                this.rangePeople = [];
+                this.loadRangePeople(p);
+            },
+            rangeAncestorOption() {
+                const cur = this.rootPustaNum();
+                if (!cur || !this.rangeFrom || this.rangeFrom >= cur) return '';
+                const name = this.treeRootData?.name || this.treeRootData?.display_name || '';
+                return '↑ ' + @js(\App\Support\FrontendLocale::text('Ancestor of')) + ' ' + name;
+            },
+            filteredRangePeople() {
+                const q = this.rangeFilter.trim().toLowerCase();
+                const list = q ? this.rangePeople.filter(r => [r.name, r.name_np, r.father_name, r.member_no, r.id]
+                    .some(v => String(v || '').toLowerCase().includes(q))) : this.rangePeople;
+                // always keep the selected person in the list
+                const sel = this.rangePeople.find(r => r.id === this.rangePersonId);
+                return sel && !list.includes(sel) ? [sel, ...list] : list;
+            },
+            rangePersonLabel(r) {
+                return r.name + (r.name_np ? ' (' + r.name_np + ')' : '')
+                    + (r.father_name ? ' — ' + @js(\App\Support\FrontendLocale::text('बुबा:')) + ' ' + r.father_name : (r.has_parent ? '' : ' — ' + @js(\App\Support\FrontendLocale::text('बुहारी / no parent'))))
+                    + (r.member_no ? ' · ' + r.member_no : '');
+            },
+
+            /* ── From पुस्ता → To पुस्ता ── */
+            rootPustaNum() { return parseInt(this.toENdigits(this.currentPusta || ''), 10) || null; },
+            depthOptions() { return [...new Set([2, 5, 10, 15, 20, 30, +this.depth])].sort((a, b) => a - b); },
+            fromOptions() {
+                const p = this.rootPustaNum();
+                return p ? Array.from({ length: p }, (_, i) => i + 1) : [];
+            },
+            toOptions() {
+                const f = this.rangeFrom || 1;
+                const max = Math.max(f, ...this.allPustas);
+                return Array.from({ length: max - f + 1 }, (_, i) => f + i);
+            },
+            rangeText() {
+                if (!this.rangeFrom || !this.rangeTo) return this.currentPusta ? '' : @js(\App\Support\FrontendLocale::text('This person has no पुस्ता saved.'));
+                const n = this.rangeTo - this.rangeFrom + 1;
+                return (this.rangeNote ? this.rangeNote + ' · ' : '') + `${n} ` + @js(\App\Support\FrontendLocale::text('generations'));
+            },
+            async applyRange() {
+                if (!this.rangeFrom || !this.rangeTo || !this.rangePersonId) return;
+                if (this.rangePersonId !== 'auto') {
+                    const wantTo = this.rangeTo;
+                    this.rootId = parseInt(this.rangePersonId, 10);
+                    this.depth = Math.max(1, Math.min(60, wantTo - this.rangeFrom + 1));
+                    this.rangeNote = '';
+                    await this.reload(0);
+                    this.rangeTo = wantTo;
+                    this.$nextTick(() => this.fit());
+                    return;
+                }
+                const p = this.rootPustaNum();
+                if (!p) return;
+                const wantFrom = this.rangeFrom, wantTo = this.rangeTo;
+                this.depth = Math.max(1, Math.min(60, wantTo - wantFrom + 1));
+                await this.reload(Math.max(0, p - wantFrom));
+                let got = this.rootPustaNum();
+                if (got && got !== wantFrom && wantTo >= got) {
+                    this.depth = Math.max(1, Math.min(60, wantTo - got + 1));
+                    await this.reload(0);
+                    got = this.rootPustaNum();
+                }
+                this.rangeNote = got && got !== wantFrom
+                    ? @js(\App\Support\FrontendLocale::text('Oldest linked ancestor is पुस्ता')) + ' ' + this.npDigits(got)
+                    : '';
+                if (got) { this.rangeFrom = got; this.rangeTo = wantTo; }
+                this.$nextTick(() => this.fit());
             },
 
             draw(data) {
@@ -1341,7 +1503,7 @@
 
                 const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
                 style.textContent = `
-                    .link{fill:none;stroke-width:1.3;marker-end:url(#arrow)}
+                    .link{fill:none;stroke:#334155;stroke-width:1.6;vector-effect:non-scaling-stroke;marker-end:url(#arrow)}
                     text{font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
                     image{image-rendering:auto}
                 `;
@@ -1358,9 +1520,24 @@
 
                 const clonedGroup = gNode.cloneNode(true);
                 clonedGroup.querySelectorAll('path.link').forEach(path => {
+                    // Strong, fixed-width lines so printers never drop them when the tree is scaled down
                     path.setAttribute('fill', 'none');
-                    path.setAttribute('stroke-width', '1.3');
+                    path.setAttribute('stroke', '#334155');
+                    path.setAttribute('stroke-opacity', '1');
+                    path.setAttribute('stroke-width', '1.6');
+                    path.setAttribute('vector-effect', 'non-scaling-stroke');
                     path.setAttribute('marker-end', 'url(#arrow)');
+                });
+                this._exportOffset = { x: pad - bbox.x, y: pad - bbox.y };
+                // Printed / downloaded tree: no "छोरा १ · जेठो" / "छोरी २" birth-order badges
+                clonedGroup.querySelectorAll('g.birth-flag').forEach(flag => flag.remove());
+                // ...and let the arrows reach the person circle instead of the removed badge
+                const srcLinks = gNode.querySelectorAll('path.link');
+                clonedGroup.querySelectorAll('path.link').forEach((path, i) => {
+                    const d = srcLinks[i]?.__data__;
+                    if (!d) return;
+                    const sx = d.source.x, sy = d.source.y + 50, tx = d.target.x, ty = d.target.y - 22, my = (sy + ty) / 2;
+                    path.setAttribute('d', `M${sx},${sy} C${sx},${my} ${tx},${my} ${tx},${ty}`);
                 });
                 clonedGroup.querySelectorAll('text').forEach(text => {
                     text.setAttribute('font-family', 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif');
@@ -1446,40 +1623,246 @@
                 }
             },
 
+            /* Boxes (in export-SVG units) of everything drawn — used to skip empty pages */
+            exportBoxes() {
+                const o = this._exportOffset || { x: 0, y: 0 };
+                const nodes = [], links = [];
+                this.g.selectAll('g.node').each(function (d) {
+                    const b = this.getBBox();
+                    nodes.push([d.x + b.x + o.x, d.y + b.y + o.y, b.width, b.height].map(Math.round));
+                });
+                this.g.selectAll('path.link').each(function () {
+                    const b = this.getBBox();
+                    links.push([b.x + o.x, b.y + o.y, b.width, b.height].map(Math.round));
+                });
+                return { nodes, links };
+            },
+
             async printTreePdf() {
+                // Print view opens in this same tab, as a full-screen panel
+                document.getElementById('treePrintOverlay')?.remove();
+                const overlay = document.createElement('div');
+                overlay.id = 'treePrintOverlay';
+                overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483000;background:#e2e8f0;';
+                overlay.innerHTML = '<p style="font:600 16px system-ui,sans-serif;padding:24px;color:#0f172a">Preparing tree…</p>';
+                document.body.appendChild(overlay);
+                const prevOverflow = document.documentElement.style.overflow;
+                document.documentElement.style.overflow = 'hidden';
+                window.closeTreePrint = () => { overlay.remove(); document.documentElement.style.overflow = prevOverflow; };
                 this.exportBusy = true;
                 try {
                     const svg = await this.buildExportSvgString();
-                    if (!svg) return;
-                    const dims = this.paperDimensionsMm();
-                    let style = document.getElementById('treePrintPageStyle');
-                    if (!style) {
-                        style = document.createElement('style');
-                        style.id = 'treePrintPageStyle';
-                        document.head.appendChild(style);
-                    }
-                    style.textContent = `@media print{@page{size:${dims.width}mm ${dims.height}mm;margin:0}html,body{width:${dims.width}mm;height:${dims.height}mm;overflow:hidden}.tree-print-export{display:flex!important;flex-direction:column;width:${dims.width}mm!important;height:${dims.height}mm!important;overflow:hidden;break-after:avoid;page-break-after:avoid}.tree-print-header{padding:8mm 10mm 4mm;text-align:center;border-bottom:1px solid #e2e8f0}.tree-print-header h1{font-size:${dims.width > 500 ? 28 : 18}px}.tree-print-svg-wrap{flex:1 1 auto;min-height:0;display:flex;align-items:center;justify-content:center;padding:5mm 7mm 8mm}.tree-print-svg-wrap svg{width:100%!important;height:100%!important;max-width:100%!important;max-height:100%!important;display:block}}`;
-
-                    const holder = document.getElementById('treePrintExport');
-                    const title = this.printHeaderText();
+                    if (!svg) { window.closeTreePrint(); return; }
                     const rootName = this.treeRootData?.display_name || this.treeRootData?.name || '';
-                    holder.innerHTML = `
-                        <div class="tree-print-header">
-                            <h1>${this.escapeHtmlText(title)}</h1>
-                            <p>Root: ${this.escapeHtmlText(rootName)} · Level ${this.depth} · Printed: ${new Date().toISOString().slice(0, 10)}</p>
-                        </div>
-                        <div class="tree-print-svg-wrap">${svg}</div>
-                    `;
-                    const printedSvg = holder.querySelector('svg');
-                    if (printedSvg) {
-                        printedSvg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-                        printedSvg.style.width = '100%';
-                        printedSvg.style.height = '100%';
-                    }
-                    requestAnimationFrame(() => window.print());
+                    const cfg = {
+                        title: this.printHeaderText(),
+                        sub: `Root: ${rootName} · ${this.rangeFrom && this.rangeTo ? `पुस्ता ${this.npDigits(this.rangeFrom)} → ${this.npDigits(this.rangeTo)}` : `Level ${this.depth}`} · Printed: ${new Date().toISOString().slice(0, 10)}`,
+                        paper: this.exportPaper, orientation: this.exportOrientation,
+                        customW: this.customWidthMm, customH: this.customHeightMm,
+                        file: this.exportFileName('pdf').replace(/\.pdf$/, ''),
+                        ...this.exportBoxes(),
+                    };
+                    const frame = document.createElement('iframe');
+                    frame.title = 'Print family tree';
+                    frame.style.cssText = 'border:0;width:100%;height:100%;display:block;background:#e2e8f0;';
+                    frame.srcdoc = this.printWindowHtml(svg, cfg);
+                    overlay.innerHTML = '';
+                    overlay.appendChild(frame);
                 } finally {
-                    setTimeout(() => { this.exportBusy = false; }, 300);
+                    this.exportBusy = false;
                 }
+            },
+
+            printWindowHtml(svg, cfg) {
+                const data = JSON.stringify(cfg).replace(/</g, '\\u003c');
+                const src  = JSON.stringify(svg).replace(/</g, '\\u003c');
+                return `<!doctype html><html><head><meta charset="utf-8"><title>${this.escapeHtmlText(cfg.title)}</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\/script>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#e2e8f0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;color:#0f172a}
+.bar{position:sticky;top:0;z-index:5;background:#0f172a;color:#fff;padding:10px 16px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:13px}
+.bar select{background:#1e293b;color:#fff;border:1px solid #334155;border-radius:8px;padding:7px 8px;font-weight:700;font-size:13px}
+.bar button{border:0;border-radius:8px;padding:9px 14px;font-weight:800;cursor:pointer;font-size:13px}
+.bar button:disabled{opacity:.5;cursor:wait}
+.b1{background:#16a34a;color:#fff}.b2{background:#2563eb;color:#fff}.b3{background:#334155;color:#fff}
+.info{padding:6px 10px;border-radius:8px;font-weight:600;background:#334155}
+.hint{width:100%;font-size:12px;color:#cbd5e1}
+#pages{display:flex;flex-wrap:wrap;gap:16px;padding:16px;align-items:flex-start}
+#pages img{display:block;background:#fff;box-shadow:0 4px 20px rgba(0,0,0,.15);height:auto}
+@media print{
+  body{background:#fff}.bar{display:none}
+  #pages{display:block;padding:0}
+  #pages img{box-shadow:none;break-after:page;page-break-after:always}
+  #pages img:last-child{break-after:auto;page-break-after:auto}
+}
+</style><style id="pagesize"></style></head><body>
+<div class="bar">
+  <button class="b3" id="backBtn">← Back to tree</button>
+  <label>Paper <select id="paper"><option>A4</option><option>A3</option><option>A2</option><option>A1</option><option>A0</option><option value="CUSTOM">Custom</option></select></label>
+  <select id="ori"><option value="landscape">Landscape</option><option value="portrait">Portrait</option></select>
+  <select id="mode"><option value="fit">Fit whole tree on 1 page</option><option value="split">Split into pages (no cut nodes)</option></select>
+  <label id="sizeCtl">Text size <select id="tsize"><option value="5">Small</option><option value="3.6" selected>Medium</option><option value="2.7">Large</option></select></label>
+  <span id="info" class="info">Preparing…</span>
+  <span style="flex:1"></span>
+  <button class="b1" id="pdfBtn" disabled>⬇ Download PDF</button>
+  <button class="b2" id="openBtn" disabled>🖨 Show PDF &amp; print</button>
+  <button class="b3" id="printBtn" disabled>Quick print</button>
+  <div class="hint">Best for printers: press <b>Show PDF &amp; print</b>, then use the printer icon in the PDF viewer with <b>Scale: Fit to page</b>. Each page is a sharp image, so every printer prints it the same way.</div>
+</div>
+<div id="pages"></div>
+<div id="pdfWrap" style="display:none;position:fixed;inset:0;z-index:10;background:#334155">
+  <div class="bar"><button class="b3" id="pdfBack">← Back to pages</button><span>Use the 🖨 print icon at the top-right of the PDF.</span></div>
+  <iframe id="pdfFrame" title="PDF preview" style="border:0;width:100%;height:calc(100% - 52px);display:block"></iframe>
+</div>
+<script>
+var cfg = ${data};
+var SRC = ${src};
+var root = new DOMParser().parseFromString(SRC, 'image/svg+xml').documentElement;
+var W = +root.getAttribute('width'), H = +root.getAttribute('height');
+var ser = new XMLSerializer();
+var INNER = Array.prototype.map.call(root.childNodes, function (n) { return ser.serializeToString(n); }).join('')
+  + '<style>.link{stroke-width:2.6px!important;stroke:#334155!important;stroke-opacity:1!important}</style>';
+var $ = function (id) { return document.getElementById(id); };
+var presets = {A4:[297,210],A3:[420,297],A2:[594,420],A1:[841,594],A0:[1189,841]};
+var M = 8, HEAD = 11, PAD = 10;
+$('paper').value = presets[cfg.paper] ? cfg.paper : (cfg.paper === 'CUSTOM' ? 'CUSTOM' : 'A4');
+$('ori').value = cfg.orientation || 'landscape';
+function dims() {
+  if ($('paper').value === 'CUSTOM') return [Math.max(200, +cfg.customW || 1500), Math.max(200, +cfg.customH || 900)];
+  var p = presets[$('paper').value];
+  return $('ori').value === 'portrait' ? [p[1], p[0]] : [p[0], p[1]];
+}
+function merged(boxes, ax) {
+  var iv = boxes.map(function (b) { return ax === 'x' ? [b[0], b[0] + b[2]] : [b[1], b[1] + b[3]]; })
+                .sort(function (a, b) { return a[0] - b[0]; });
+  var out = [];
+  iv.forEach(function (r) {
+    var last = out[out.length - 1];
+    if (last && r[0] <= last[1] + 1) last[1] = Math.max(last[1], r[1]); else out.push([r[0], r[1]]);
+  });
+  return out;
+}
+// split [first..last interval] into segments of at most "size", cutting only in gaps between intervals
+function segments(iv, size) {
+  var segs = [];
+  if (!iv.length) return segs;
+  var s = iv[0][0] - PAD, end = iv[iv.length - 1][1] + PAD;
+  var guard = 0;
+  while (s < end - 1 && guard++ < 5000) {
+    var lim = s + size;
+    if (lim >= end) { segs.push([s, end]); break; }
+    var e = lim;
+    for (var i = 0; i < iv.length; i++) {
+      if (iv[i][0] < lim && iv[i][1] > lim) { if (iv[i][0] - 2 > s + 1) e = iv[i][0] - 2; break; }
+    }
+    segs.push([s, e]);
+    var next = null;
+    for (var j = 0; j < iv.length; j++) if (iv[j][1] > e) { next = iv[j]; break; }
+    if (!next) break;
+    s = Math.max(e, next[0] - PAD);
+  }
+  return segs;
+}
+function overlaps(b, x0, y0, x1, y1) { return b[0] <= x1 && b[0] + b[2] >= x0 && b[1] <= y1 && b[1] + b[3] >= y0; }
+function layout() {
+  var d = dims(), w = d[0], h = d[1], cw = w - 2 * M, ch = h - 2 * M - HEAD;
+  if ($('mode').value === 'fit') {
+    // fit the real drawing (not the padded canvas) so it is centred on the page
+    var all = cfg.nodes.concat(cfg.links), bx0 = 0, by0 = 0, bx1 = W, by1 = H;
+    if (all.length) {
+      bx0 = Math.max(0, Math.min.apply(null, all.map(function (b) { return b[0]; })) - PAD);
+      by0 = Math.max(0, Math.min.apply(null, all.map(function (b) { return b[1]; })) - PAD);
+      bx1 = Math.min(W, Math.max.apply(null, all.map(function (b) { return b[0] + b[2]; })) + PAD);
+      by1 = Math.min(H, Math.max.apply(null, all.map(function (b) { return b[1] + b[3]; })) + PAD);
+    }
+    var fw = bx1 - bx0, fh = by1 - by0;
+    return { w: w, h: h, upm: Math.max(fw / cw, fh / ch), pages: [{ vb: [bx0, by0, fw, fh], r: 1, c: 1 }] };
+  }
+  var upm = +$('tsize').value, tw = cw * upm, th = ch * upm, pages = [];
+  var rows = segments(merged(cfg.nodes, 'y'), th);
+  rows.forEach(function (row, ri) {
+    var band = cfg.nodes.filter(function (b) { return overlaps(b, -1e9, row[0], 1e9, row[1]); });
+    segments(merged(band, 'x'), tw).forEach(function (col, ci) {
+      var items = cfg.nodes.concat(cfg.links).filter(function (b) { return overlaps(b, col[0], row[0], col[1], row[1]); });
+      if (!items.some(function (b) { return overlaps(b, col[0], row[0], col[1], row[1]) && cfg.nodes.indexOf(b) >= 0; })) return;
+      var x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+      items.forEach(function (b) {
+        x0 = Math.min(x0, Math.max(col[0], b[0] - PAD)); y0 = Math.min(y0, Math.max(row[0], b[1] - PAD));
+        x1 = Math.max(x1, Math.min(col[1], b[0] + b[2] + PAD)); y1 = Math.max(y1, Math.min(row[1], b[1] + b[3] + PAD));
+      });
+      pages.push({ vb: [x0, y0, x1 - x0, y1 - y0], r: ri + 1, c: ci + 1 });
+    });
+  });
+  return { w: w, h: h, upm: upm, pages: pages };
+}
+function loadImg(url) { return new Promise(function (ok, bad) { var i = new Image(); i.onload = function () { ok(i); }; i.onerror = bad; i.src = url; }); }
+var job = 0, rendered = [];
+async function render() {
+  var my = ++job;
+  ['pdfBtn', 'openBtn', 'printBtn'].forEach(function (id) { $(id).disabled = true; });
+  $('sizeCtl').style.display = $('mode').value === 'fit' ? 'none' : '';
+  var L = layout(), w = L.w, h = L.h, cw = w - 2 * M, ch = h - 2 * M - HEAD;
+  var dpi = Math.min(200, 9000 / Math.max(w, h) * 25.4), px = dpi / 25.4;
+  $('pagesize').textContent = '@media print{@page{size:' + w + 'mm ' + h + 'mm;margin:0}#pages img{width:' + w + 'mm!important;height:' + (h - 1) + 'mm!important}}';
+  var holder = $('pages'); holder.innerHTML = ''; rendered = [];
+  for (var i = 0; i < L.pages.length; i++) {
+    if (my !== job) return;
+    $('info').textContent = 'Making page ' + (i + 1) + ' of ' + L.pages.length + '…';
+    var pg = L.pages[i], vb = pg.vb;
+    var dw = vb[2] / L.upm, dh = vb[3] / L.upm;              // content size on paper (mm)
+    var ox = M + (cw - dw) / 2, oy = M + HEAD + (ch - dh) / 2; // centred in the printable area
+    var cv = document.createElement('canvas');
+    cv.width = Math.round(w * px); cv.height = Math.round(h * px);
+    var ctx = cv.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.fillStyle = '#0f172a'; ctx.textBaseline = 'alphabetic';
+    ctx.font = 'bold ' + (4 * px) + 'px system-ui, sans-serif';
+    ctx.fillText(cfg.title, M * px, (M + 5) * px);
+    ctx.font = (2.8 * px) + 'px system-ui, sans-serif'; ctx.fillStyle = '#475569';
+    ctx.fillText(cfg.sub, M * px, (M + 9) * px);
+    if (L.pages.length > 1) {
+      var lab = 'Page ' + (i + 1) + '/' + L.pages.length + '  ·  row ' + pg.r + ', part ' + pg.c;
+      ctx.font = 'bold ' + (3 * px) + 'px system-ui, sans-serif'; ctx.fillStyle = '#0f172a';
+      ctx.fillText(lab, (w - M) * px - ctx.measureText(lab).width, (M + 5) * px);
+    }
+    ctx.fillStyle = '#cbd5e1'; ctx.fillRect(M * px, (M + HEAD - 1) * px, cw * px, Math.max(1, 0.3 * px));
+    var svgStr = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="' + Math.round(dw * px) + '" height="' + Math.round(dh * px)
+      + '" viewBox="' + vb.join(' ') + '">' + INNER + '</svg>';
+    var url = URL.createObjectURL(new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' }));
+    try { var img = await loadImg(url); ctx.drawImage(img, ox * px, oy * px, dw * px, dh * px); }
+    finally { URL.revokeObjectURL(url); }
+    var jpg = cv.toDataURL('image/jpeg', 0.95);
+    rendered.push(jpg);
+    var el = document.createElement('img'); el.src = jpg; el.style.width = Math.min(w * 1.2, 380) + 'mm'; holder.appendChild(el);
+  }
+  var textMm = 11 / L.upm; // name text height on paper
+  $('info').textContent = L.pages.length + ' page' + (L.pages.length > 1 ? 's' : '') + ' · names ≈ ' + textMm.toFixed(1) + ' mm'
+    + (textMm < 1.8 ? ' — too small, choose “Split into pages”' : ' — readable');
+  ['pdfBtn', 'openBtn', 'printBtn'].forEach(function (id) { $(id).disabled = false; });
+}
+function makePdf() {
+  var d = dims(), w = d[0], h = d[1];
+  var pdf = new window.jspdf.jsPDF({ orientation: w > h ? 'l' : 'p', unit: 'mm', format: [w, h], compress: true });
+  rendered.forEach(function (jpg, i) { if (i) pdf.addPage([w, h], w > h ? 'l' : 'p'); pdf.addImage(jpg, 'JPEG', 0, 0, w, h); });
+  return pdf;
+}
+$('pdfBtn').onclick = function () { makePdf().save((cfg.file || 'family-tree') + '.pdf'); };
+var pdfUrl = null;
+$('openBtn').onclick = function () {
+  if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+  pdfUrl = URL.createObjectURL(makePdf().output('blob'));
+  $('pdfFrame').src = pdfUrl;
+  $('pdfWrap').style.display = 'block';
+};
+$('pdfBack').onclick = function () { $('pdfWrap').style.display = 'none'; };
+$('backBtn').onclick = function () { if (parent && parent.closeTreePrint) parent.closeTreePrint(); else history.back(); };
+document.addEventListener('keydown', function (e) { if (e.key === 'Escape') $('backBtn').click(); });
+$('printBtn').onclick = function () { window.print(); };
+var t; ['paper', 'ori', 'mode', 'tsize'].forEach(function (id) { $(id).addEventListener('change', function () { clearTimeout(t); t = setTimeout(render, 150); }); });
+if (W / 2.7 > 8000) $('mode').value = 'fit';
+render();
+<\/script></body></html>`;
             },
         };
     }
